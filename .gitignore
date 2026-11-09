@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local agent notes
+.local/
+_spec_extract.txt
+
 
 # vercel
 .vercel
@@ -39,3 +45,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/srs/
+/IMPLEMENTATION_PROGRESS.md
+/AGENTS.md
+/CLAUDE.md
+/supabase/.temp/

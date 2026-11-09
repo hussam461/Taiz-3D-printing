@@ -1,0 +1,33 @@
+import { CartProvider } from "@/components/storefront/cart-provider";
+import { CartLink } from "@/components/storefront/cart-link";
+import { StoreFooter, StoreHeader } from "@/components/storefront/chrome";
+import { getStorefrontContext } from "@/lib/queries/storefront";
+import { publicMediaUrl } from "@/lib/storage/public-url";
+import { StoreBreadcrumbs } from "@/components/storefront/store-breadcrumbs";
+
+export default async function StorefrontLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { store, contact } = await getStorefrontContext();
+  return (
+    <CartProvider>
+      <div className="storefront-shell flex min-h-full flex-1 flex-col">
+        <StoreHeader storeName={store.store_name} logoUrl={publicMediaUrl(store.logo_path, "store-assets")} cartSlot={<CartLink />} />
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+          <StoreBreadcrumbs />
+          {children}
+        </main>
+        <StoreFooter
+          storeName={store.store_name}
+          description={store.description}
+          phone={contact.phone}
+          whatsapp={contact.whatsapp}
+          instagram={contact.instagram}
+          email={contact.email}
+        />
+      </div>
+    </CartProvider>
+  );
+}
