@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-navy: #0b1220;
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-accent: #06b6d4;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-elevated: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-error: #b91c1c;
+  --color-info: #1d4ed8;
+  --font-sans: var(--font-arabic);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-arabic), "IBM Plex Sans Arabic", Tahoma, sans-serif;
+}
+
+.storefront-shell {
+  cursor: default;
+}
+
+.storefront-shell a[href],
+.storefront-shell button:not(:disabled),
+.storefront-shell summary,
+.storefront-shell label,
+.storefront-shell select,
+.storefront-shell input[type="checkbox"],
+.storefront-shell input[type="radio"],
+.storefront-shell [role="button"] {
+  cursor: pointer;
+}
+
+.storefront-shell button:disabled {
+  cursor: not-allowed;
+}
+
+.storefront-shell input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
+.storefront-shell textarea,
+.storefront-shell [contenteditable="true"] {
+  cursor: text;
+}
+
+
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.store-search-field:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
+.checkout-form :is(input, select, textarea):focus-visible {
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
+summary {
+  list-style: none;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes cart-toast-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@keyframes truck-drive {
+  0% { transform: translateX(0); opacity: 1; }
+  45% { transform: translateX(-10px); opacity: 0; }
+  55% { transform: translateX(10px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.animate-truck-drive { animation: truck-drive 700ms ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-truck-drive { animation: none; }
 }
