@@ -343,7 +343,6 @@ export function ProductForm({
           </Field>
           <Field id="category_id" label="التصنيف" required error={fieldErrors.category_id}>
             <select id="category_id" name="category_id" defaultValue={product?.category_id ?? ""} required aria-required="true" aria-invalid={Boolean(fieldErrors.category_id)} aria-describedby={fieldErrors.category_id ? "category_id-error" : "category_id-hint"} className={inputClass} onChange={() => clearFieldError("category_id")}>
-              <option value="" disabled>اختر تصنيفًا</option>
               {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
             {categories.length === 0 ? <p className="text-xs text-warning">لا توجد تصنيفات متاحة. أنشئ تصنيفًا أولًا قبل حفظ المنتج.</p> : null}

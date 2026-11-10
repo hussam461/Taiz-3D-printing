@@ -1,12 +1,14 @@
 import { cache } from "react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { publicMediaUrl } from "@/lib/storage/public-url";
 
 export type Category = {
   id: string;
   name: string;
   slug: string;
   description: string | null;
+  image_url?: string | null;
 };
 
 export type HomepageSlide = {
@@ -83,6 +85,8 @@ export async function getStorefrontContext() {
         hero_description:
           "منتجات جاهزة وطلبات مخصّصة، بأسعار بالريال اليمني القديم.",
         logo_path: null as string | null,
+         all_products_image_path: null as string | null,
+         custom_order_image_path: null as string | null,
         deposit_percent: 30,
       },
       contact: {
@@ -105,6 +109,8 @@ export async function getStorefrontContext() {
       hero_headline: "طباعة ثلاثية الأبعاد بتفاصيل تصنع الفرق",
       hero_description: "",
       logo_path: null,
+      all_products_image_path: null,
+      custom_order_image_path: null,
       deposit_percent: 30,
     },
     contact: contact ?? { phone: null, whatsapp: null, instagram: null, email: null },
@@ -115,12 +121,23 @@ export async function getStorefrontContext() {
 export async function getActiveCategories(): Promise<Category[]> {
   const supabase = await db();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("categories")
-    .select("id, name, slug, description")
+    .select("id, name, slug, description, image_path")
     .eq("is_active", true)
     .order("sort_order");
-  return data ?? [];
+  if (error?.code === "PGRST204" || error?.code === "42703") {
+    const legacy = await supabase.from("categories").select("id, name, slug, description").eq("is_active", true).order("sort_order");
+    return legacy.data ?? [];
+  }
+  if (error) {
+    console.error("Active categories could not be loaded", { error });
+    return [];
+  }
+  return (data ?? []).map((category) => ({
+    ...category,
+    image_url: publicMediaUrl(category.image_path, "store-assets"),
+  }));
 }
 
 function mapProducts(

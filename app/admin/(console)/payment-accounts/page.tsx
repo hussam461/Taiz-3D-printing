@@ -10,6 +10,7 @@ export default async function Page() {
       <p className="mb-4 text-sm text-muted">ترتيب الحسابات في إتمام الطلب يُحدّث تلقائيًا بحسب الإضافة.</p>
       <p className="mb-4 text-sm text-muted">لا يمكن حذف الحساب الأخير أو إفراغ الحسابات النشطة.</p>
       <SimpleCrud
+        polished
         table="payment_accounts"
         rows={data ?? []}
         fields={[

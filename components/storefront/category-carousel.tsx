@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { Category } from "@/lib/queries/storefront";
 
-const tileClassName = "group flex h-28 w-[calc((100vw-3.5rem)/3)] shrink-0 snap-start flex-col items-center justify-center gap-2.5 rounded-xl border border-border bg-white px-2 text-center text-navy shadow-lg shadow-slate-900/10 transition hover:-translate-y-1 hover:text-teal-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:h-36 sm:gap-3 sm:w-[calc((100%-3rem)/4)] sm:px-4 xl:w-[calc((100%-5rem)/6)]";
+const tileClassName = "group flex w-[calc((100vw-3.5rem)/3)] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border/80 bg-white text-center text-navy shadow-sm transition-[transform,box-shadow,color] duration-200 hover:scale-[1.015] hover:text-teal-600 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-[calc((100%-3rem)/4)] xl:w-[calc((100%-5rem)/6)]";
 
 function CategoryIcon({ type }: { type: "products" | "custom" | "category" }) {
   if (type === "products") {
@@ -20,7 +21,7 @@ function ArrowIcon({ direction }: { direction: "previous" | "next" }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d={direction === "previous" ? "m14.5 5-7 7 7 7" : "m9.5 5 7 7-7 7"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-export function CategoryCarousel({ categories }: { categories: Category[] }) {
+export function CategoryCarousel({ categories, allProductsImageUrl, customOrderImageUrl }: { categories: Category[]; allProductsImageUrl: string | null; customOrderImageUrl: string | null }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollPrevious, setCanScrollPrevious] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
@@ -49,22 +50,24 @@ export function CategoryCarousel({ categories }: { categories: Category[] }) {
   };
 
   return (
-    <div className="relative z-20 mx-auto -mt-14 w-full max-w-[76rem] px-3 sm:-mt-20 sm:px-6 lg:px-8">
+    <div className="relative z-20 mx-auto -mt-6 w-full max-w-[76rem] px-3 sm:-mt-20 sm:px-6 lg:px-8">
       <button type="button" onClick={() => scroll(-320)} disabled={!canScrollPrevious} aria-label="التصنيفات السابقة" className={`absolute left-1 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition sm:left-2 ${canScrollPrevious ? "border border-border bg-white text-navy shadow-lg shadow-slate-900/15 hover:-translate-y-[calc(50%+2px)] hover:bg-slate-50" : "cursor-not-allowed border border-transparent bg-transparent text-slate-300 shadow-none"}`}>
         <ArrowIcon direction="previous" />
       </button>
       <div ref={scrollRef} dir="rtl" className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto px-2 pb-1 sm:gap-4 sm:px-12">
         <Link dir="rtl" href="/products" className={tileClassName}>
-          <CategoryIcon type="products" />
-          <span className="text-sm font-semibold sm:text-base">جميع المنتجات</span>
+          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">{allProductsImageUrl ? <Image src={allProductsImageUrl} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="products" /></span>}</span>
+          <span className="flex min-h-9 items-center justify-center px-1 py-1.5 text-xs font-semibold sm:min-h-11 sm:text-sm">جميع المنتجات</span>
         </Link>
         <Link dir="rtl" href="/custom-order" className={tileClassName}>
-          <CategoryIcon type="custom" />
-          <span className="text-sm font-semibold sm:text-base">طلب مخصّص</span>
+          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">{customOrderImageUrl ? <Image src={customOrderImageUrl} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="custom" /></span>}</span>
+          <span className="flex min-h-9 items-center justify-center px-1 py-1.5 text-xs font-semibold sm:min-h-11 sm:text-sm">طلب مخصّص</span>
         </Link>
         {categories.map((category) => <Link dir="rtl" key={category.id} href={`/products?category=${category.slug}`} className={tileClassName}>
-          <CategoryIcon type="category" />
-          <span className="line-clamp-2 text-sm font-semibold sm:text-base">{category.name}</span>
+          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">
+            {category.image_url ? <Image src={category.image_url} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center transition-transform duration-300 motion-reduce:transition-none group-hover:scale-[1.02]" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="category" /></span>}
+          </span>
+          <span className="line-clamp-2 flex min-h-8 items-center justify-center px-1 py-1 text-[11px] font-semibold leading-4 sm:min-h-11 sm:px-1.5 sm:py-1.5 sm:text-sm sm:leading-normal">{category.name}</span>
         </Link>)}
       </div>
       <button type="button" onClick={() => scroll(320)} disabled={!canScrollNext} aria-label="التصنيفات التالية" className={`absolute right-1 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition sm:right-2 ${canScrollNext ? "border border-border bg-white text-navy shadow-lg shadow-slate-900/15 hover:-translate-y-[calc(50%+2px)] hover:bg-slate-50" : "cursor-not-allowed border border-transparent bg-transparent text-slate-300 shadow-none"}`}>
