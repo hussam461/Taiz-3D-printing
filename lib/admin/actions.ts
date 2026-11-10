@@ -10,18 +10,6 @@ import { PAYMENT_CURRENCIES } from "@/types/domain";
 import { hasValidProductImageSignature, parseProductForm, productImageExtension, validateProductImageMetadata } from "@/lib/validation/product";
 import { parseDeliveryFee } from "@/lib/validation/delivery-fee";
 
-async function log(action: string, entityType: string, entityId?: string, metadata?: unknown) {
-  const admin = await requireAdmin();
-  const supabase = await createServerSupabase();
-  await supabase.from("activity_logs").insert({
-    actor_id: admin.user.id,
-    action,
-    entity_type: entityType,
-    entity_id: entityId ?? null,
-    metadata: metadata ?? null,
-  });
-}
-
 async function isImageReferencedByHistoricalOrder(
   supabase: SupabaseClient,
   productId: string,
@@ -114,7 +102,6 @@ export async function updateOrderStatus(orderId: string, toStatus: string, note?
     note: note ?? null,
   });
   if (historyError) console.error("Order status history could not be recorded", { orderId, toStatus, error: historyError });
-  await log("order.status", "order", orderId, { from: order.order_status, to: toStatus });
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
   return { ok: true as const };
@@ -123,12 +110,6 @@ export async function updateOrderStatus(orderId: string, toStatus: string, note?
 export async function completeOrderDelivery(orderId: string) {
   await requireAdmin();
   const supabase = await createServerSupabase();
-  const { data: orderBefore, error: orderLoadError } = await supabase
-    .from("orders")
-    .select("order_status, remaining_old_yer, payable_remaining, payment_currency")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (orderLoadError || !orderBefore) return { ok: false as const, error: "تعذر تحميل الطلب. حدّث الصفحة ثم حاول مرة أخرى." };
   const { error } = await supabase.rpc("admin_complete_order_delivery", { p_order_id: orderId });
   if (error) {
     console.error("Order delivery and balance collection could not be recorded", { orderId, error });
@@ -142,12 +123,6 @@ export async function completeOrderDelivery(orderId: string) {
     if (error.message.includes("order not found")) return { ok: false as const, error: "الطلب غير موجود. حدّث الصفحة وتحقق منه." };
     return { ok: false as const, error: "تعذر تأكيد التسليم. حدّث الصفحة وتحقق من حالة الطلب ثم حاول مجددًا." };
   }
-  await log("order.delivery_completed", "order", orderId, {
-    amountOldYer: Number(orderBefore.remaining_old_yer),
-    payableAmount: Number(orderBefore.payable_remaining),
-    currency: orderBefore.payment_currency,
-    previousStatus: orderBefore.order_status,
-  });
   revalidatePath("/admin");
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
@@ -176,7 +151,6 @@ export async function reviewProof(proofId: string, decision: "approved" | "rejec
     if (error.code === "PGRST202" || error.code === "PGRST204") return { ok: false as const, error: "تحديث قاعدة البيانات المطلوب غير مفعّل بعد. شغّل migration تشغيل الطلبات وإثباتات الدفع ثم أعد المحاولة." };
     return { ok: false as const, error: "تعذر مراجعة الإثبات وتحديث الطلب. لم يُسجّل القرار؛ أعد المحاولة." };
   }
-  await log("proof.review", "payment_proof", proofId, { decision, reason });
   revalidatePath("/admin");
   revalidatePath("/admin/orders");
   revalidatePath("/admin/payment-proofs");
@@ -286,9 +260,6 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
       if (error) console.error("Old product image cleanup failed", { productId, error });
     }
   }
-
-  const activity = await supabase.from("activity_logs").insert({ actor_id: admin.user.id, action: created ? "product.create" : "product.update", entity_type: "product", entity_id: productId, metadata: null });
-  if (activity.error) console.error("Could not write product activity log", { productId, error: activity.error });
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/admin/products");
   revalidatePath("/products");
@@ -299,7 +270,6 @@ export async function deactivateProduct(id: string) {
   await requireAdmin();
   const supabase = await createServerSupabase();
   await supabase.from("products").update({ is_active: false }).eq("id", id);
-  await log("product.deactivate", "product", id);
   revalidatePath("/admin/products");
   return { ok: true as const };
 }
@@ -313,7 +283,6 @@ export async function toggleProductPublication(id: string, currentlyActive: bool
   }
   const { error } = await supabase.from("products").update({ is_active: !currentlyActive, is_featured: currentlyActive ? false : undefined, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { ok: false as const, error: `تعذر ${currentlyActive ? "إيقاف نشر" : "إعادة نشر"} المنتج.` };
-  await log(currentlyActive ? "product.deactivate" : "product.publish", "product", id);
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
   revalidatePath("/products");
@@ -345,7 +314,6 @@ export async function deleteProduct(id: string) {
     }
   }
   if (removablePaths.length > 0) await supabase.storage.from("product-images").remove(removablePaths);
-  await log("product.delete", "product", id, { slug: product.slug, historical_orders_preserved: true });
   revalidatePath("/admin/products");
   revalidatePath("/products");
   return { ok: true as const };
@@ -484,8 +452,6 @@ export async function saveSimpleRow(table: string, formData: FormData) {
       return { ok: false as const, error: "تعذر تعيين هذا العنصر كافتراضي. أُعيد الخيار السابق إن وُجد؛ حاول مرة أخرى." };
     }
   }
-
-  await log(`${table}.save`, table, savedId || undefined);
   revalidatePath("/admin");
   const adminPath = table === "delivery_areas" ? "delivery" : table === "payment_accounts" ? "payment-accounts" : table === "faq_items" ? "faq" : table === "homepage_benefits" ? "homepage-benefits" : table === "legal_pages" ? "legal-pages" : table;
   revalidatePath(`/admin/${adminPath}`);
@@ -527,7 +493,6 @@ export async function deleteSimpleRow(table: string, id: string) {
     if (table === "payment_accounts") return { ok: false as const, error: error.message.includes("حساب دفع") ? error.message : "تعذر حذف حساب الدفع. تأكد من وجود حساب نشط آخر." };
     return { ok: false as const, error: "تعذر حذف العنصر. تحقق من البيانات وحاول مرة أخرى." };
   }
-  await log(`${table}.delete`, table, id);
   revalidatePath("/admin");
   revalidatePath(`/admin/${table === "delivery_areas" ? "delivery" : table === "payment_accounts" ? "payment-accounts" : table === "faq_items" ? "faq" : table === "homepage_benefits" ? "homepage-benefits" : table === "legal_pages" ? "legal-pages" : table}`);
   if (table === "homepage_benefits") revalidatePath("/");
@@ -544,7 +509,6 @@ export async function saveFreeDelivery(formData: FormData) {
     updated_at: new Date().toISOString(),
   });
   if (error) return { ok: false as const, error: "تعذر حفظ إعداد التوصيل المجاني" };
-  await log("free_delivery.save", "settings", "1");
   revalidatePath("/admin/offers");
   return { ok: true as const };
 }
@@ -559,7 +523,6 @@ export async function saveExchangeRate(formData: FormData) {
     created_by: admin.user.id,
   });
   if (error) return { ok: false as const, error: "تعذر حفظ سعر التحويل" };
-  await log("exchange.create", "exchange_rate");
   revalidatePath("/admin/currencies");
   return { ok: true as const };
 }
@@ -613,7 +576,6 @@ export async function saveStoreSettings(formData: FormData) {
     const { error: cleanupError } = await supabase.storage.from("store-assets").remove([oldLogoPath]);
     if (cleanupError) console.error("Failed to remove the replaced store logo", { path: oldLogoPath, error: cleanupError });
   }
-  await log("store.save", "store_settings", "1");
   revalidatePath("/");
   revalidatePath("/", "layout");
   revalidatePath("/admin/settings");
@@ -688,7 +650,6 @@ export async function saveHomepageSlide(formData: FormData) {
     const { error: cleanupError } = await supabase.storage.from("store-assets").remove([current.image_path]);
     if (cleanupError) console.error("Could not remove replaced homepage slide image", { path: current.image_path, error: cleanupError });
   }
-  await log(id ? "homepage_slide.update" : "homepage_slide.create", "homepage_slide", saved.id);
   revalidatePath("/");
   revalidatePath("/admin/homepage-slides");
   return { ok: true as const, id: saved.id };
@@ -707,7 +668,6 @@ export async function reorderHomepageSlides(formData: FormData) {
     console.error("Homepage slide reorder failed", { error });
     return { ok: false as const, error: "تعذر تحديث الترتيب. حدّث الصفحة ثم حاول مرة أخرى." };
   }
-  await log("homepage_slide.reorder", "homepage_slide");
   revalidatePath("/");
   revalidatePath("/admin/homepage-slides");
   return { ok: true as const };
@@ -730,7 +690,6 @@ export async function deleteHomepageSlide(id: string) {
     const { error: storageError } = await supabase.storage.from("store-assets").remove([slide.image_path]);
     if (storageError) console.error("Homepage slide deleted but its image cleanup failed", { path: slide.image_path, error: storageError });
   }
-  await log("homepage_slide.delete", "homepage_slide", id);
   revalidatePath("/");
   revalidatePath("/admin/homepage-slides");
   return { ok: true as const };
@@ -748,7 +707,6 @@ export async function saveContactSettings(formData: FormData) {
     updated_at: new Date().toISOString(),
   });
   if (error) return { ok: false as const, error: "تعذر حفظ معلومات التواصل" };
-  await log("contact.save", "contact_settings", "1");
   revalidatePath("/");
   revalidatePath("/admin/contact-information");
   return { ok: true as const };
@@ -764,7 +722,6 @@ export async function saveLegalPage(formData: FormData) {
     updated_at: new Date().toISOString(),
   });
   if (error) return { ok: false as const, error: "تعذر حفظ الصفحة القانونية" };
-  await log("legal.save", "legal_pages", String(formData.get("slug")));
   revalidatePath("/admin/legal-pages");
   return { ok: true as const };
 }
