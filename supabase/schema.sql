@@ -377,17 +377,6 @@ create table if not exists public.order_status_history (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.activity_logs (
-  id uuid primary key default gen_random_uuid(),
-  actor_id uuid references auth.users (id),
-  action text not null,
-  entity_type text not null,
-  entity_id text,
-  metadata jsonb,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists activity_logs_created_idx on public.activity_logs (created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- RLS
@@ -411,7 +400,6 @@ alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 alter table public.payment_proofs enable row level security;
 alter table public.order_status_history enable row level security;
-alter table public.activity_logs enable row level security;
 
 create or replace function public.is_admin()
 returns boolean
@@ -634,11 +622,6 @@ drop policy if exists history_admin_read on public.order_status_history;
 create policy history_admin_read on public.order_status_history for select using (public.is_admin());
 drop policy if exists history_admin_insert on public.order_status_history;
 create policy history_admin_insert on public.order_status_history for insert with check (public.is_admin());
-drop policy if exists activity_admin_all on public.activity_logs;
-drop policy if exists activity_admin_read on public.activity_logs;
-create policy activity_admin_read on public.activity_logs for select using (public.is_admin());
-drop policy if exists activity_admin_insert on public.activity_logs;
-create policy activity_admin_insert on public.activity_logs for insert with check (public.is_admin());
 drop policy if exists admin_profiles_self on public.admin_profiles;
 create policy admin_profiles_self on public.admin_profiles for select using (user_id = auth.uid() or public.is_admin());
 
@@ -693,7 +676,7 @@ to authenticated;
 grant select, update on table public.orders to authenticated;
 grant select on table public.order_items, public.admin_profiles to authenticated;
 grant select, update on table public.payment_proofs to authenticated;
-grant select, insert on table public.order_status_history, public.activity_logs to authenticated;
+grant select, insert on table public.order_status_history to authenticated;
 grant all privileges on all tables in schema public to service_role;
 grant execute on function public.is_admin() to anon, authenticated, service_role;
 
