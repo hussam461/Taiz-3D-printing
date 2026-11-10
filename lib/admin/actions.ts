@@ -464,6 +464,72 @@ export async function saveSimpleRow(table: string, formData: FormData) {
   return { ok: true as const, id: savedId ?? undefined };
 }
 
+export async function saveCategory(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createServerSupabase();
+  const id = String(formData.get("id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const slug = id ? String(formData.get("current_slug") ?? "").trim() : `category-${crypto.randomUUID().slice(0, 8)}`;
+  const isActive = formData.get("is_active") === "on";
+  if (!name || name.length > 80) return { ok: false as const, error: "اكتب اسمًا للتصنيف لا يتجاوز 80 حرفًا." };
+  if (!/^[a-z0-9-]+$/.test(slug)) return { ok: false as const, error: "تعذر تحديد رابط التصنيف. حدّث الصفحة وحاول مجددًا." };
+
+  let current: { id: string; image_path: string | null } | null = null;
+  if (id) {
+    const { data, error } = await supabase.from("categories").select("id, image_path").eq("id", id).maybeSingle();
+    if (error) {
+      console.error("Category image migration is unavailable", { error });
+      return { ok: false as const, error: "ميزة صور التصنيفات تحتاج تحديث قاعدة البيانات. طبّق ترحيل category_images ثم أعد المحاولة." };
+    }
+    if (!data) return { ok: false as const, error: "التصنيف غير موجود. حدّث الصفحة وحاول مجددًا." };
+    current = data;
+  }
+
+  const imageValue = formData.get("category_image");
+  const image = imageValue instanceof File && imageValue.size > 0 ? imageValue : null;
+  const removeImage = formData.get("remove_category_image") === "on";
+  let uploadedPath: string | null = null;
+  if (image) {
+    const metadataError = validateProductImageMetadata(image);
+    if (metadataError) return { ok: false as const, error: metadataError };
+    const bytes = new Uint8Array(await image.arrayBuffer());
+    if (!hasValidProductImageSignature(image.type, bytes)) return { ok: false as const, error: "محتوى الملف لا يطابق صورة صالحة. اختر JPG أو PNG أو WebP." };
+    uploadedPath = `categories/${crypto.randomUUID()}.${productImageExtension(image.type)}`;
+    const { error } = await supabase.storage.from("store-assets").upload(uploadedPath, Buffer.from(bytes), { contentType: image.type, upsert: false });
+    if (error) {
+      console.error("Category image upload failed", { error });
+      return { ok: false as const, error: "تعذر رفع الصورة. تحقق من الاتصال وحاول مرة أخرى." };
+    }
+  }
+
+  const payload = {
+    name,
+    slug,
+    description: null,
+    is_active: isActive,
+    image_path: uploadedPath ?? (removeImage ? null : current?.image_path ?? null),
+    updated_at: new Date().toISOString(),
+  };
+  const { data: saved, error } = id
+    ? await supabase.from("categories").update(payload).eq("id", id).select("id").maybeSingle()
+    : await supabase.from("categories").insert(payload).select("id").maybeSingle();
+  if (error || !saved) {
+    if (uploadedPath) await supabase.storage.from("store-assets").remove([uploadedPath]);
+    if (error?.code === "PGRST204" || error?.code === "42703") return { ok: false as const, error: "ميزة صور التصنيفات تحتاج تحديث قاعدة البيانات. طبّق ترحيل category_images ثم أعد المحاولة." };
+    console.error("Category save failed", { error });
+    return { ok: false as const, error: error?.code === "23505" ? "يوجد تصنيف بهذا الاسم أو الرابط بالفعل." : "تعذر حفظ التصنيف. تحقق من البيانات وحاول مرة أخرى." };
+  }
+
+  if ((uploadedPath || removeImage) && current?.image_path && !current.image_path.startsWith("/") && !/^https?:\/\//i.test(current.image_path)) {
+    const { error: cleanupError } = await supabase.storage.from("store-assets").remove([current.image_path]);
+    if (cleanupError) console.error("Replaced category image cleanup failed", { path: current.image_path, error: cleanupError });
+  }
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath("/admin/categories");
+  return { ok: true as const, id: saved.id };
+}
+
 async function restoreSingleDefault(supabase: Awaited<ReturnType<typeof createServerSupabase>>, table: string, defaultId: string | null) {
   const { error: clearError } = await supabase.from(table).update({ is_default: false }).eq("is_default", true);
   if (clearError) console.error("Could not clear default flags during recovery", { table, error: clearError });
@@ -486,12 +552,21 @@ export async function deleteSimpleRow(table: string, id: string) {
   ]);
   if (!allowed.has(table) || !id) return { ok: false as const, error: "العنصر المطلوب غير صالح" };
   const supabase = await createServerSupabase();
+  let categoryImage: string | null = null;
+  if (table === "categories") {
+    const { data } = await supabase.from("categories").select("image_path").eq("id", id).maybeSingle();
+    categoryImage = data?.image_path ?? null;
+  }
   const column = table === "legal_pages" ? "slug" : "id";
   const { error } = await supabase.from(table).delete().eq(column, id);
   if (error) {
     if (table === "categories") return { ok: false as const, error: "لا يمكن حذف التصنيف لأنه مرتبط بمنتج. عطّله بدلًا من حذفه." };
     if (table === "payment_accounts") return { ok: false as const, error: error.message.includes("حساب دفع") ? error.message : "تعذر حذف حساب الدفع. تأكد من وجود حساب نشط آخر." };
     return { ok: false as const, error: "تعذر حذف العنصر. تحقق من البيانات وحاول مرة أخرى." };
+  }
+  if (table === "categories" && categoryImage && !categoryImage.startsWith("/") && !/^https?:\/\//i.test(categoryImage)) {
+    const { error: cleanupError } = await supabase.storage.from("store-assets").remove([categoryImage]);
+    if (cleanupError) console.error("Deleted category image cleanup failed", { path: categoryImage, error: cleanupError });
   }
   revalidatePath("/admin");
   revalidatePath(`/admin/${table === "delivery_areas" ? "delivery" : table === "payment_accounts" ? "payment-accounts" : table === "faq_items" ? "faq" : table === "homepage_benefits" ? "homepage-benefits" : table === "legal_pages" ? "legal-pages" : table}`);
@@ -534,6 +609,7 @@ export async function saveStoreSettings(formData: FormData) {
   if (currentError) return { ok: false as const, error: "تعذر تحميل إعدادات المتجر. أعد المحاولة." };
   const logoValue = formData.get("logo_image");
   const logoFile = logoValue instanceof File && logoValue.size > 0 ? logoValue : null;
+  const removeLogo = formData.get("remove_logo_image") === "on";
   let uploadedLogoPath: string | null = null;
   if (logoFile) {
     const metadataError = validateProductImageMetadata(logoFile);
@@ -549,14 +625,50 @@ export async function saveStoreSettings(formData: FormData) {
       return { ok: false as const, error: "تعذر رفع الشعار. تحقق من الاتصال وحاول مرة أخرى." };
     }
   }
+  const cardImageFields = [
+    { formName: "all_products_image", removeName: "remove_all_products_image", pathKey: "all_products_image_path", prefix: "all-products", error: "تعذر رفع صورة جميع المنتجات." },
+    { formName: "custom_order_image", removeName: "remove_custom_order_image", pathKey: "custom_order_image_path", prefix: "custom-order", error: "تعذر رفع صورة الطلب المخصص." },
+  ] as const;
+  const uploadedCardPaths: Partial<Record<(typeof cardImageFields)[number]["pathKey"], string>> = {};
+  const cleanupPendingImageUploads = async () => {
+    const paths = [uploadedLogoPath, ...Object.values(uploadedCardPaths)].filter((path): path is string => Boolean(path));
+    if (!paths.length) return;
+    const { error } = await supabase.storage.from("store-assets").remove(paths);
+    if (error) console.error("Could not clean up unfinished store image uploads", { paths, error });
+  };
+  for (const field of cardImageFields) {
+    const value = formData.get(field.formName);
+    const file = value instanceof File && value.size > 0 ? value : null;
+    if (!file) continue;
+    const metadataError = validateProductImageMetadata(file);
+    if (metadataError) {
+      await cleanupPendingImageUploads();
+      return { ok: false as const, error: metadataError };
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!hasValidProductImageSignature(file.type, bytes)) {
+      await cleanupPendingImageUploads();
+      return { ok: false as const, error: "محتوى الملف لا يطابق صورة صالحة. اختر JPG أو PNG أو WebP." };
+    }
+    const path = `${field.prefix}/${crypto.randomUUID()}.${productImageExtension(file.type)}`;
+    const { error: uploadError } = await supabase.storage.from("store-assets").upload(path, Buffer.from(bytes), { contentType: file.type, upsert: false });
+    if (uploadError) {
+      console.error("Storefront card image upload failed", { field: field.pathKey, error: uploadError });
+      await cleanupPendingImageUploads();
+      return { ok: false as const, error: field.error };
+    }
+    uploadedCardPaths[field.pathKey] = path;
+  }
   const depositRaw = formData.get("deposit_percent");
   const { error } = await supabase.from("store_settings").upsert({
     id: 1,
     store_name: String(formData.get("store_name") ?? current?.store_name ?? "Taiz 3D Printing"),
-    logo_path: uploadedLogoPath ?? current?.logo_path ?? null,
+    logo_path: uploadedLogoPath ?? (removeLogo ? null : current?.logo_path ?? null),
     description: String(formData.get("description") ?? current?.description ?? ""),
     hero_headline: String(formData.get("hero_headline") ?? current?.hero_headline ?? ""),
     hero_description: String(formData.get("hero_description") ?? current?.hero_description ?? ""),
+    all_products_image_path: uploadedCardPaths.all_products_image_path ?? (formData.get("remove_all_products_image") === "on" ? null : current?.all_products_image_path ?? null),
+    custom_order_image_path: uploadedCardPaths.custom_order_image_path ?? (formData.get("remove_custom_order_image") === "on" ? null : current?.custom_order_image_path ?? null),
     deposit_percent:
       depositRaw == null || String(depositRaw) === ""
         ? Number(current?.deposit_percent ?? 30)
@@ -564,15 +676,20 @@ export async function saveStoreSettings(formData: FormData) {
     updated_at: new Date().toISOString(),
   });
   if (error) {
-    if (uploadedLogoPath) {
-      const { error: cleanupError } = await supabase.storage.from("store-assets").remove([uploadedLogoPath]);
-      if (cleanupError) console.error("Failed to clean up an unlinked store logo", { path: uploadedLogoPath, error: cleanupError });
-    }
+    await cleanupPendingImageUploads();
     console.error("Store settings save failed", { error });
     return { ok: false as const, error: "تعذر حفظ إعدادات المتجر. أعد المحاولة." };
   }
+  for (const field of cardImageFields) {
+    const uploadedPath = uploadedCardPaths[field.pathKey];
+    const oldPath = current?.[field.pathKey] as string | null | undefined;
+    if ((uploadedPath || formData.get(field.removeName) === "on") && oldPath && !oldPath.startsWith("/") && !/^https?:\/\//i.test(oldPath)) {
+      const { error: cleanupError } = await supabase.storage.from("store-assets").remove([oldPath]);
+      if (cleanupError) console.error("Failed to remove old storefront card image", { path: oldPath, error: cleanupError });
+    }
+  }
   const oldLogoPath = current?.logo_path;
-  if (uploadedLogoPath && oldLogoPath && oldLogoPath !== uploadedLogoPath && !oldLogoPath.startsWith("/") && !/^https?:\/\//i.test(oldLogoPath)) {
+  if ((uploadedLogoPath || removeLogo) && oldLogoPath && !oldLogoPath.startsWith("/") && !/^https?:\/\//i.test(oldLogoPath)) {
     const { error: cleanupError } = await supabase.storage.from("store-assets").remove([oldLogoPath]);
     if (cleanupError) console.error("Failed to remove the replaced store logo", { path: oldLogoPath, error: cleanupError });
   }

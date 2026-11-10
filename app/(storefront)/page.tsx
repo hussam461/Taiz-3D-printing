@@ -42,7 +42,7 @@ export default async function HomePage() {
           <p className="mt-4 max-w-2xl text-white/80 sm:text-lg">{store.hero_description}</p>
         </div>}
 
-        <CategoryCarousel categories={categories} />
+        <CategoryCarousel categories={categories} allProductsImageUrl={publicMediaUrl(store.all_products_image_path, "store-assets")} customOrderImageUrl={publicMediaUrl(store.custom_order_image_path, "store-assets")} />
       </section>
 
       {featured.length > 0 ? (

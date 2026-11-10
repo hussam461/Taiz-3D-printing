@@ -75,7 +75,6 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
                       const option = materials.find((material) => material.id === event.target.value);
                       if (option) setVariant(item.productId, item.colorId, item.materialId, item.colorId, item.colorName, option.id, option.name);
                     }} className="min-h-10 rounded-lg border border-border bg-white px-2 text-sm text-text">
-                      {!materials.some((material) => material.id === item.materialId) ? <option value="" disabled>اختر الخامة</option> : null}
                       {materials.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}
                     </select>
                   </label> : null}
