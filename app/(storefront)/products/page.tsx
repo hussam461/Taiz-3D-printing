@@ -1,9 +1,6 @@
-import Link from "next/link";
 import { getColors, getMaterials, searchProducts } from "@/lib/queries/storefront";
-import { ProductCardView } from "@/components/storefront/product-card";
+import { ProductResults } from "@/components/storefront/product-results";
 import { ProductFilters } from "@/components/storefront/product-filters";
-
-type SearchValues = { q?: string; category?: string; discounted?: string; featured?: string; sort?: string };
 
 export default async function ProductsPage({
   searchParams,
@@ -14,7 +11,6 @@ export default async function ProductsPage({
     discounted?: string;
     featured?: string;
     sort?: string;
-    page?: string;
     storefrontSearch?: string;
   }>;
 }) {
@@ -29,44 +25,44 @@ export default async function ProductsPage({
       discounted: params.discounted === "1",
       featured: params.featured === "1",
       sort,
-      page: params.page ? Number(params.page) : 1,
+      page: 1,
     }),
     getColors(),
     getMaterials(),
   ]);
   const defaultColor = colors.find((color) => color.is_default) ?? colors[0] ?? null;
   const defaultMaterial = materials.find((material) => material.is_default) ?? materials[0] ?? null;
+  const resultsKey = JSON.stringify([
+    queryText ?? "",
+    params.category ?? "",
+    params.discounted === "1",
+    params.featured === "1",
+    sort ?? "",
+  ]);
 
-  const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
   return (
     <div className="space-y-6">
       <ProductFilters params={filterParams} />
-
       {result.items.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-8 text-center text-muted">
           لا توجد منتجات مطابقة.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-          {result.items.map((product) => (
-            <ProductCardView key={product.id} product={product} defaultColor={defaultColor} defaultMaterial={defaultMaterial} />
-          ))}
-        </div>
+        <ProductResults
+          key={resultsKey}
+          initialItems={result.items}
+          total={result.total}
+          filters={{
+            q: queryText,
+            category: params.category,
+            discounted: params.discounted === "1",
+            featured: params.featured === "1",
+            sort,
+          }}
+          defaultColor={defaultColor ? { id: defaultColor.id, name: defaultColor.name } : null}
+          defaultMaterial={defaultMaterial ? { id: defaultMaterial.id, name: defaultMaterial.name } : null}
+        />
       )}
-
-      {totalPages > 1 ? (
-        <div className="flex justify-center gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Link
-              key={page}
-              href={{ pathname: "/products", query: { ...params, page: String(page) } }}
-              className={`rounded-md border px-3 py-1 ${page === result.page ? "border-primary text-primary" : "border-border"}`}
-            >
-              {page}
-            </Link>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
