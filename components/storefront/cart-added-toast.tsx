@@ -38,7 +38,7 @@ export function CartAddedToast({ item, onDismiss }: { item: CartItem | null; onD
   const price = discountedUnitPrice({ basePriceOldYer: item.basePriceOldYer, discountPercent: item.discountPercent });
 
   return (
-    <aside ref={toastRef} role="status" aria-live="polite" aria-label="تمت إضافة المنتج إلى السلة" className="fixed inset-x-3 top-20 z-[70] mx-auto w-auto max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-2xl sm:inset-x-auto sm:left-6 sm:right-auto sm:top-24 sm:w-[min(32rem,calc(100vw-3rem))]">
+    <aside ref={toastRef} role="status" aria-live="polite" aria-label="تمت إضافة المنتج إلى السلة" className="cart-toast-enter fixed inset-x-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[70] mx-auto w-auto max-w-md overflow-hidden rounded-2xl border border-border bg-white shadow-2xl sm:inset-x-auto sm:left-6 sm:right-auto sm:w-[min(32rem,calc(100vw-3rem))]">
       <div className="h-1 w-full bg-slate-100"><div className="h-full w-full origin-right animate-[cart-toast-progress_5s_linear_forwards] bg-emerald-500" /></div>
       <div className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3 border-b border-border pb-3">

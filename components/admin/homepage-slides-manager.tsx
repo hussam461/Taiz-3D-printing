@@ -94,7 +94,7 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
       {slideActions}
     </div>
     <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
-      <div className="relative aspect-[2.7/1] w-full shrink-0 overflow-hidden rounded-xl bg-navy sm:w-56">{slide.image_url ? <Image src={slide.image_url} alt="" fill sizes="224px" unoptimized className="object-contain" /> : <span className="flex h-full items-center justify-center text-xs text-white/70">لا توجد صورة</span>}</div>
+      <div className="relative aspect-[2.7/1] w-full shrink-0 overflow-hidden rounded-xl bg-navy sm:w-56">{slide.image_url ? <Image src={slide.image_url} alt="" fill sizes="224px" unoptimized className="object-cover object-center" /> : <span className="flex h-full items-center justify-center text-xs text-white/70">لا توجد صورة</span>}</div>
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-semibold text-navy">{slide.title?.trim() || "بدون عنوان نصي"}</p>
         {slide.description?.trim() ? <p className="mt-1 line-clamp-2 leading-6 text-muted">{slide.description}</p> : null}
@@ -120,7 +120,7 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
       <div className="order-first space-y-3 lg:order-none">
         <div className={`relative flex aspect-[2.7/1] items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition ${isDragging ? "border-primary bg-blue-50" : "border-border bg-slate-50"}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); chooseFile(event.dataTransfer.files[0] ?? null); }}>
           <input ref={imageInputRef} name="slide_image" type="file" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} required={!slide && !selectedFile} onChange={(event) => chooseFile(event.currentTarget.files?.[0] ?? null)} className="sr-only" aria-label="صورة الشريحة بصيغة JPG أو PNG أو WebP، بحد أقصى 5 ميغابايت" />
-          {currentImage ? <Image src={currentImage} alt="" fill sizes="(max-width: 1024px) 100vw, 300px" unoptimized className="bg-navy object-contain" /> : <div className="px-4 text-center text-muted"><span aria-hidden="true" className="text-3xl">▧</span><p className="mt-1 text-sm font-semibold">اسحب الصورة إلى هنا</p><p className="mt-1 text-xs">أو اخترها من جهازك</p></div>}
+          {currentImage ? <Image src={currentImage} alt="" fill sizes="(max-width: 1024px) 100vw, 300px" unoptimized className="bg-navy object-cover object-center" /> : <div className="px-4 text-center text-muted"><span aria-hidden="true" className="text-3xl">▧</span><p className="mt-1 text-sm font-semibold">اسحب الصورة إلى هنا</p><p className="mt-1 text-xs">أو اخترها من جهازك</p></div>}
           {slide && !selectedFile && currentImage ? <span className="absolute start-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm">الصورة الحالية</span> : null}
           {selectedFile ? <span className="absolute start-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm">معاينة الصورة الجديدة</span> : null}
         </div>
@@ -129,7 +129,7 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
           {selectedFile ? <button type="button" onClick={clearPreview} className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted underline underline-offset-4 hover:text-text">{slide?.image_url ? "إلغاء الاستبدال" : "إزالة الصورة"}</button> : null}
         </div>
         {imageError ? <p className="text-sm font-medium text-red-700" role="alert">{imageError}</p> : null}
-        {selectedFile ? <p className="truncate text-xs text-muted" title={selectedFile.name}>{selectedFile.name} · {formatFileSize(selectedFile.size)} · تُرفع عند الحفظ</p> : <p className="text-xs leading-5 text-muted">JPG أو PNG أو WebP، بحد أقصى 5MB. الصورة الحالية تبقى كما هي ما لم تختر بديلًا.</p>}
+        {selectedFile ? <p className="truncate text-xs text-muted" title={selectedFile.name}>{selectedFile.name} · {formatFileSize(selectedFile.size)} · تُرفع عند الحفظ</p> : <p className="text-xs leading-5 text-muted">JPG أو PNG أو WebP، بحد أقصى 5MB. الأفضل 1920 × 750 بكسل؛ حافظ على العنصر الأساسي في المنتصف لأن الأطراف تُقص قليلًا على الجوال. الصورة الحالية تبقى ما لم تختر بديلًا.</p>}
       </div>
     </ActionForm>
   </section>;

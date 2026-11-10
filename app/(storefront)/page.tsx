@@ -9,7 +9,6 @@ import {
   getPublishedHomepageSlides,
   getStorefrontContext,
 } from "@/lib/queries/storefront";
-import { ProductCardView } from "@/components/storefront/product-card";
 import { ProductsCarousel } from "@/components/storefront/latest-products-carousel";
 import { HeroCarousel } from "@/components/storefront/hero-carousel";
 import { CategoryCarousel } from "@/components/storefront/category-carousel";

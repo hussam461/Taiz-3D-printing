@@ -199,6 +199,8 @@ export async function getRelatedProducts(categorySlug: string, excludeProductId:
   return mapProducts(data ?? []);
 }
 
+export const PRODUCTS_PAGE_SIZE = 15;
+
 export type ProductListQuery = {
   q?: string;
   category?: string;
@@ -212,9 +214,9 @@ export type ProductListQuery = {
 
 export async function searchProducts(query: ProductListQuery) {
   const supabase = await db();
-  if (!supabase) return { items: [] as ProductCard[], total: 0, page: 1, pageSize: 12 };
+  if (!supabase) return { items: [] as ProductCard[], total: 0, page: 1, pageSize: PRODUCTS_PAGE_SIZE };
   const page = Math.max(1, query.page ?? 1);
-  const pageSize = 12;
+  const pageSize = PRODUCTS_PAGE_SIZE;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const term = query.q?.replace(/[^\p{L}\p{N}\s-]/gu, " ").trim();
