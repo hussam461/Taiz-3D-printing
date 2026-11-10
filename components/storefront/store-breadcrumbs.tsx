@@ -52,7 +52,7 @@ export function StoreBreadcrumbs() {
     }
   }, [pathname]);
 
-  if (pathname === "/" || pathname.startsWith("/products/")) return null;
+  if (pathname === "/" || pathname === "/products" || pathname.startsWith("/products/")) return null;
 
   let crumbs: Crumb[];
   if (pathname === "/cart") {

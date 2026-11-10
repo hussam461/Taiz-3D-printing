@@ -700,6 +700,59 @@ export async function saveStoreSettings(formData: FormData) {
   return { ok: true as const };
 }
 
+export async function saveCustomOrderContent(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createServerSupabase();
+  const { data: current, error: loadError } = await supabase.from("custom_order_content").select("*").eq("id", 1).maybeSingle();
+  if (loadError) {
+    console.error("Custom order content could not be loaded before save", { error: loadError });
+    return { ok: false as const, error: "تعذر تحميل محتوى الطلب المخصص. تأكد من تشغيل migration المحتوى ثم حاول مرة أخرى." };
+  }
+  const defaultSteps = [
+    { title: "شارك فكرتك", description: "أرسل وصفًا مختصرًا لما تريد طباعته أو أرفق صورة أو تصميمًا في المحادثة." },
+    { title: "نراجع التفاصيل", description: "نراجع الفكرة وإمكانية التنفيذ والخامة المناسبة، ثم نوضح لك أي تفاصيل لازمة." },
+    { title: "نؤكد السعر والمدة", description: "يتم الاتفاق على السعر ومدة الإنتاج وطريقة التسليم قبل بدء التنفيذ." },
+  ];
+  const defaultMaterials = ["فكرة أو وصف للقطعة", "صورة أو رسم مرجعي", "ملف تصميم جاهز", "الخامة واللون المطلوبان"];
+  const storedSteps = Array.isArray(current?.steps) ? current.steps : defaultSteps;
+  const storedMaterials = Array.isArray(current?.materials) ? current.materials : defaultMaterials;
+  const text = (name: string, fallback = "") => formData.has(name) ? String(formData.get(name) ?? "").trim() : fallback;
+  const steps = [1, 2, 3].map((index) => ({
+    title: text(`step_${index}_title`, String(storedSteps[index - 1]?.title ?? defaultSteps[index - 1].title).trim()),
+    description: text(`step_${index}_description`, String(storedSteps[index - 1]?.description ?? defaultSteps[index - 1].description).trim()),
+  }));
+  const materials = [1, 2, 3, 4].map((index) => text(`material_${index}`, String(storedMaterials[index - 1] ?? defaultMaterials[index - 1]).trim()));
+  if (steps.some((step) => !step.title || !step.description) || materials.some((item) => !item)) {
+    return { ok: false as const, error: "أكمل عناوين وأوصاف الخطوات وجميع عناصر القائمة قبل الحفظ." };
+  }
+  if (text("title").length > 120 || text("description").length > 500 || text("note").length > 500) {
+    return { ok: false as const, error: "اختصر النصوص الطويلة ثم حاول الحفظ مرة أخرى." };
+  }
+  const { error } = await supabase.from("custom_order_content").upsert({
+    id: 1,
+    eyebrow: text("eyebrow", current?.eyebrow ?? "تصنيع حسب فكرتك"),
+    title: text("title", current?.title ?? "حوّل فكرتك إلى قطعة مطبوعة ثلاثيًا"),
+    description: text("description", current?.description ?? ""),
+    whatsapp_message: text("whatsapp_message", current?.whatsapp_message ?? "مرحبًا، أريد طلب طباعة ثلاثية الأبعاد مخصّصة."),
+    response_time: text("response_time", current?.response_time ?? "نراجع التفاصيل ونرد عليك بأقرب وقت ممكن."),
+    process_title: text("process_title", current?.process_title ?? "كيف يتم طلبك؟"),
+    process_description: text("process_description", current?.process_description ?? ""),
+    steps,
+    materials_title: text("materials_title", current?.materials_title ?? "ما الذي يمكنك إرساله؟"),
+    materials_description: text("materials_description", current?.materials_description ?? ""),
+    materials,
+    note: text("note", current?.note ?? ""),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) {
+    console.error("Custom order content save failed", { error });
+    return { ok: false as const, error: "تعذر حفظ محتوى الطلب المخصص. طبّق migration المحتوى ثم حاول مرة أخرى." };
+  }
+  revalidatePath("/custom-order");
+  revalidatePath("/admin/custom-order");
+  return { ok: true as const };
+}
+
 export async function saveHomepageSlide(formData: FormData) {
   await requireAdmin();
   const supabase = await createServerSupabase();

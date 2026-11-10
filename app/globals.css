@@ -89,6 +89,12 @@ body {
   box-shadow: none;
 }
 
+.storefront-shell :is(input, select, textarea):focus-visible {
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
 summary {
   list-style: none;
 }

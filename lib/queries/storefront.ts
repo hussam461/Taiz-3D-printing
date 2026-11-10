@@ -25,6 +25,40 @@ export type HomepageBenefit = {
   description: string;
 };
 
+export type CustomOrderContent = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  whatsapp_message: string;
+  response_time: string;
+  process_title: string;
+  process_description: string;
+  steps: Array<{ title: string; description: string }>;
+  materials_title: string;
+  materials_description: string;
+  materials: string[];
+  note: string;
+};
+
+const DEFAULT_CUSTOM_ORDER_CONTENT: CustomOrderContent = {
+  eyebrow: "تصنيع حسب فكرتك",
+  title: "حوّل فكرتك إلى قطعة مطبوعة ثلاثيًا",
+  description: "لديك فكرة أو تصميم أو صورة وتحتاج إلى تنفيذها؟ تواصل معنا عبر واتساب، وسنراجع التفاصيل معك ونقترح طريقة التنفيذ المناسبة.",
+  whatsapp_message: "مرحبًا، أريد طلب طباعة ثلاثية الأبعاد مخصّصة.",
+  response_time: "نراجع التفاصيل ونرد عليك بأقرب وقت ممكن.",
+  process_title: "كيف يتم طلبك؟",
+  process_description: "ثلاث خطوات واضحة من إرسال الفكرة حتى تأكيد التنفيذ.",
+  steps: [
+    { title: "شارك فكرتك", description: "أرسل وصفًا مختصرًا لما تريد طباعته أو أرفق صورة أو تصميمًا في المحادثة." },
+    { title: "نراجع التفاصيل", description: "نراجع الفكرة وإمكانية التنفيذ والخامة المناسبة، ثم نوضح لك أي تفاصيل لازمة." },
+    { title: "نؤكد السعر والمدة", description: "يتم الاتفاق على السعر ومدة الإنتاج وطريقة التسليم قبل بدء التنفيذ." },
+  ],
+  materials_title: "ما الذي يمكنك إرساله؟",
+  materials_description: "أرسل وصفًا للفكرة، صورة مرجعية، رسمًا، أو ملف تصميم جاهز. الطلبات المخصصة لا تُسعّر تلقائيًا من السلة؛ يتم تحديد السعر والتفاصيل بعد مراجعة الطلب.",
+  materials: ["فكرة أو وصف للقطعة", "صورة أو رسم مرجعي", "ملف تصميم جاهز", "الخامة واللون المطلوبان"],
+  note: "هذا المسار مخصص للطلبات التي تحتاج مراجعة وتسعيرًا يدويًا. لا يتم تأكيد الطلب أو بدء التصنيع قبل الاتفاق معك على السعر والتفاصيل.",
+};
+
 export type ProductCard = {
   id: string;
   name: string;
@@ -72,6 +106,26 @@ export async function getPublishedHomepageBenefits(): Promise<HomepageBenefit[]>
     return [];
   }
   return (data ?? []) as HomepageBenefit[];
+}
+
+export async function getCustomOrderContent(): Promise<CustomOrderContent> {
+  const supabase = await db();
+  if (!supabase) return DEFAULT_CUSTOM_ORDER_CONTENT;
+  const { data, error } = await supabase.from("custom_order_content").select("*").eq("id", 1).maybeSingle();
+  if (error || !data) {
+    if (error) console.error("Custom order content could not be loaded", { error });
+    return DEFAULT_CUSTOM_ORDER_CONTENT;
+  }
+  const rawSteps: unknown = data.steps;
+  const rawMaterials: unknown = data.materials;
+  const steps = Array.isArray(rawSteps) ? rawSteps.filter((step: unknown): step is { title: string; description: string } => Boolean(step && typeof step === "object" && "title" in step && typeof step.title === "string" && "description" in step && typeof step.description === "string")) : [];
+  const materials = Array.isArray(rawMaterials) ? rawMaterials.filter((item: unknown): item is string => typeof item === "string" && item.trim().length > 0) : [];
+  return {
+    ...DEFAULT_CUSTOM_ORDER_CONTENT,
+    ...data,
+    steps: steps.length ? steps : DEFAULT_CUSTOM_ORDER_CONTENT.steps,
+    materials: materials.length ? materials : DEFAULT_CUSTOM_ORDER_CONTENT.materials,
+  } as CustomOrderContent;
 }
 
 export async function getStorefrontContext() {

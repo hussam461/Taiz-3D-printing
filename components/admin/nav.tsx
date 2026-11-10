@@ -9,7 +9,7 @@ const GROUPS = [
   { title: "التشغيل", links: [["نظرة عامة", "/admin"], ["الطلبات", "/admin/orders"], ["إثباتات الدفع", "/admin/payment-proofs"]] },
   { title: "الكتالوج", links: [["المنتجات", "/admin/products"], ["التصنيفات", "/admin/categories"], ["الألوان", "/admin/colors"], ["الخامات", "/admin/materials"]] },
   { title: "التوصيل والدفع", links: [["مناطق التوصيل", "/admin/delivery"], ["التوصيل المجاني", "/admin/offers"], ["حسابات الدفع", "/admin/payment-accounts"], ["العملات والتحويل", "/admin/currencies"]] },
-  { title: "المحتوى", links: [["معلومات المتجر", "/admin/store-information"], ["شرائح الصفحة الرئيسية", "/admin/homepage-slides"], ["مزايا المتجر الرئيسية", "/admin/homepage-benefits"], ["معلومات التواصل", "/admin/contact-information"], ["الأسئلة الشائعة", "/admin/faq"], ["الصفحات القانونية", "/admin/legal-pages"]] },
+  { title: "المحتوى", links: [["معلومات المتجر", "/admin/store-information"], ["شرائح الصفحة الرئيسية", "/admin/homepage-slides"], ["مزايا المتجر الرئيسية", "/admin/homepage-benefits"], ["صفحة الطلب المخصص", "/admin/custom-order"], ["معلومات التواصل", "/admin/contact-information"], ["الأسئلة الشائعة", "/admin/faq"], ["الصفحات القانونية", "/admin/legal-pages"]] },
   { title: "النظام", links: [["الإعدادات", "/admin/settings"]] },
 ] as const;
 

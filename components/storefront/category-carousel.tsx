@@ -50,7 +50,7 @@ export function CategoryCarousel({ categories, allProductsImageUrl, customOrderI
   };
 
   return (
-    <div className="relative z-20 mx-auto -mt-6 w-full max-w-[76rem] px-3 sm:-mt-20 sm:px-6 lg:px-8">
+    <div className="relative z-20 mx-auto mt-4 w-full max-w-[76rem] px-3 sm:mt-6 sm:px-6 lg:px-8">
       <button type="button" onClick={() => scroll(-320)} disabled={!canScrollPrevious} aria-label="التصنيفات السابقة" className={`absolute left-1 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition sm:left-2 ${canScrollPrevious ? "border border-border bg-white text-navy shadow-lg shadow-slate-900/15 hover:-translate-y-[calc(50%+2px)] hover:bg-slate-50" : "cursor-not-allowed border border-transparent bg-transparent text-slate-300 shadow-none"}`}>
         <ArrowIcon direction="previous" />
       </button>
