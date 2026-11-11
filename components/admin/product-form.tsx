@@ -1,12 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { upsertProduct } from "@/lib/admin/actions";
+import { createProductImageUploadUrl, discardProductImageUpload, upsertProduct } from "@/lib/admin/actions";
+import { createBrowserSupabase } from "@/lib/supabase/browser";
 import { FeedbackNotice } from "@/components/admin/feedback-notice";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import {
+  PRODUCT_IMAGE_MAX_BYTES,
   PRODUCT_IMAGE_MIME_TYPES,
   parseProductForm,
   sanitizeProductDescriptionMarkup,
@@ -40,6 +42,34 @@ type ActionState =
   | null;
 
 const initialState: ActionState = null;
+
+async function compressProductImage(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    let scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("تعذر تجهيز الصورة على هذا الجهاز.");
+    for (let resizeAttempt = 0; resizeAttempt < 5; resizeAttempt += 1) {
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.88, 0.82, 0.76, 0.7]) {
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+        if (!blob || blob.type !== "image/webp") throw new Error("تعذر ضغط الصورة بصيغة مناسبة على هذا الجهاز.");
+        if (blob.size <= PRODUCT_IMAGE_MAX_BYTES) {
+          const name = `${file.name.replace(/\.[^.]+$/, "") || "product-image"}.webp`;
+          return new File([blob], name, { type: "image/webp", lastModified: Date.now() });
+        }
+      }
+      scale *= 0.82;
+    }
+    throw new Error("حجم الصورة كبير جدًا. اختر صورة أصغر.");
+  } finally {
+    bitmap.close();
+  }
+}
 
 function initialSpecifications(value: unknown): SpecRow[] {
   if (!Array.isArray(value)) return [];
@@ -115,7 +145,10 @@ export function ProductForm({
   );
   const [successToastPaused, setSuccessToastPaused] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [hasSavedSuccessfully, setHasSavedSuccessfully] = useState(createdNotice);
+  const [uploadedImagePath, setUploadedImagePath] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [compressingImage, setCompressingImage] = useState(false);
+  const [hasSavedSuccessfully] = useState(createdNotice);
   const [formDirty, setFormDirty] = useState(false);
   const initialDescriptionMarkup = sanitizeProductDescriptionMarkup(product?.description ?? "");
   const [descriptionMarkup, setDescriptionMarkup] = useState(initialDescriptionMarkup);
@@ -160,24 +193,16 @@ export function ProductForm({
 
   useEffect(() => {
     if (!actionState) return;
+    if (actionState.ok) {
+      submissionLock.current = false;
+      router.replace(`/admin/products?saved=${actionState.created ? "created" : "updated"}`);
+      return;
+    }
     const timer = window.setTimeout(() => {
       submissionLock.current = false;
-      if (actionState.ok) {
-        setFieldErrors({});
-        setHasSavedSuccessfully(true);
-        setFormDirty(false);
-        // The server confirmed the upload/save. Clear the file so a later data-only
-        // save cannot upload the same image again.
-        selectedFileRef.current = null;
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        if (imageInputRef.current) imageInputRef.current.value = "";
-        router.replace(`/admin/products?saved=${actionState.created ? "created" : "updated"}`);
-        router.refresh();
-        return;
-      }
       setFieldErrors(actionState.fieldErrors ?? {});
       setFeedback({ tone: "error", message: actionState.error });
+      setUploadingImage(false);
       const form = formRef.current;
       if (!form) return;
       for (const [name, savedValue] of lastFieldValues.current) {
@@ -195,9 +220,13 @@ export function ProductForm({
         }
       }
       if (selectedFileRef.current && imageInputRef.current) {
-        const transfer = new DataTransfer();
-        transfer.items.add(selectedFileRef.current);
-        imageInputRef.current.files = transfer.files;
+        try {
+          const transfer = new DataTransfer();
+          transfer.items.add(selectedFileRef.current);
+          imageInputRef.current.files = transfer.files;
+        } catch (error) {
+          console.error("Could not restore the selected image in the file input", error);
+        }
       }
       const firstError = Object.keys(actionState.fieldErrors ?? {})[0];
       if (firstError) window.setTimeout(() => document.getElementById(firstError)?.focus(), 0);
@@ -220,9 +249,28 @@ export function ProductForm({
     setFeedback(null);
   }
 
-  function acceptFile(file: File | undefined) {
+  async function acceptFile(file: File | undefined) {
     if (!file) return;
-    const error = validateProductImageMetadata(file);
+    if (!PRODUCT_IMAGE_MIME_TYPES.includes(file.type as (typeof PRODUCT_IMAGE_MIME_TYPES)[number])) {
+      const error = validateProductImageMetadata(file);
+      setFieldErrors((current) => ({ ...current, image: error ?? "صيغة الصورة غير مدعومة." }));
+      setFeedback({ tone: "error", message: "اختر صورة بصيغة JPG أو PNG أو WebP." });
+      return;
+    }
+    let preparedFile = file;
+    if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+      setCompressingImage(true);
+      try {
+        preparedFile = await compressProductImage(file);
+      } catch (error) {
+        setFieldErrors((current) => ({ ...current, image: error instanceof Error ? error.message : "تعذر تجهيز الصورة." }));
+        setFeedback({ tone: "error", message: "تعذر تصغير الصورة تلقائيًا على هذا الجهاز. اختر صورة أصغر بصيغة JPG أو PNG أو WebP." });
+        setCompressingImage(false);
+        return;
+      }
+      setCompressingImage(false);
+    }
+    const error = validateProductImageMetadata(preparedFile);
     if (error) {
       setFieldErrors((current) => ({ ...current, image: error }));
       setFeedback({ tone: "error", message: "لم تُحفظ الصورة. صحح المشكلة الموضحة في قسم الصورة." });
@@ -230,13 +278,10 @@ export function ProductForm({
     }
     // Dropped files update the preview, but must also be assigned to the real
     // file input so the browser includes them in the submitted FormData.
-    if (imageInputRef.current && imageInputRef.current.files?.[0] !== file) {
-      const transfer = new DataTransfer();
-      transfer.items.add(file);
-      imageInputRef.current.files = transfer.files;
-    }
-    selectedFileRef.current = file;
-    setSelectedFile(file);
+    if (uploadedImagePath) void discardProductImageUpload(uploadedImagePath);
+    setUploadedImagePath(null);
+    selectedFileRef.current = preparedFile;
+    setSelectedFile(preparedFile);
     setFormDirty(true);
     clearFieldError("image");
   }
@@ -260,6 +305,15 @@ export function ProductForm({
     syncDescription();
   }
 
+  function clearSelectedImage() {
+    selectedFileRef.current = null;
+    setSelectedFile(null);
+    if (uploadedImagePath) void discardProductImageUpload(uploadedImagePath);
+    setUploadedImagePath(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    clearFieldError("image");
+  }
+
   function rememberValues(form: HTMLFormElement) {
     const values = new Map<string, string | boolean | Array<string | boolean>>();
     const controls = Array.from(form.elements).filter((element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement => "name" in element && Boolean((element as HTMLInputElement).name));
@@ -276,7 +330,7 @@ export function ProductForm({
     lastFieldValues.current = values;
   }
 
-  function validateBeforeSubmit(event: FormEvent<HTMLFormElement>) {
+  async function validateBeforeSubmit(event: FormEvent<HTMLFormElement>) {
     if (submissionLock.current) {
       event.preventDefault();
       return;
@@ -285,7 +339,7 @@ export function ProductForm({
     const formData = new FormData(form);
     const parsed = parseProductForm(formData);
     const nextErrors: ProductFieldErrors = parsed.success ? {} : parsed.fieldErrors;
-    const file = imageInputRef.current?.files?.[0] ?? null;
+    const file = selectedFileRef.current ?? imageInputRef.current?.files?.[0] ?? null;
     const isActive = formData.get("is_active") === "on";
 
     if (file) {
@@ -311,6 +365,39 @@ export function ProductForm({
     setFeedback(null);
     rememberValues(form);
     submissionLock.current = true;
+
+    if (!file && !uploadedImagePath) return;
+    event.preventDefault();
+    setUploadingImage(true);
+    let preparedPath: string | null = null;
+    try {
+      let path = uploadedImagePath;
+      if (!path && file) {
+        const prepared = await createProductImageUploadUrl(file.type, file.size);
+        if (!prepared.ok) throw new Error(prepared.error);
+        preparedPath = prepared.path;
+        const browserSupabase = createBrowserSupabase();
+        const { error } = await browserSupabase.storage.from("product-images").uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type, cacheControl: "3600" });
+        if (error) throw error;
+        path = prepared.path;
+        setUploadedImagePath(path);
+      }
+      if (!path) throw new Error("تعذر تحديد الصورة المرفوعة.");
+      const submitData = new FormData(form);
+      submitData.delete("product_image");
+      submitData.delete("product_images");
+      submitData.set("uploaded_product_image_path", path);
+      setUploadingImage(false);
+      startTransition(() => { formAction(submitData); });
+    } catch (error) {
+      if (preparedPath) void discardProductImageUpload(preparedPath);
+      setUploadedImagePath(null);
+      setUploadingImage(false);
+      submissionLock.current = false;
+      setFieldErrors((current) => ({ ...current, image: "لم يكتمل رفع الصورة. تحقق من اتصال الإنترنت وحاول مجددًا." }));
+      console.error("Product image upload failed in the browser", error);
+      setFeedback({ tone: "error", message: error instanceof Error && error.message.startsWith("تعذر تجهيز") ? error.message : "تعذر رفع الصورة إلى التخزين. تحقق من اتصال الإنترنت ثم حاول مرة أخرى." });
+    }
   }
 
   const fieldNames: Record<keyof ProductFieldErrors, string> = {
@@ -326,6 +413,7 @@ export function ProductForm({
   return (
     <form ref={formRef} action={formAction} noValidate onChange={() => setFormDirty(true)} onSubmit={validateBeforeSubmit} className="max-w-5xl space-y-6">
       {product ? <><input type="hidden" name="id" value={product.id} /><input type="hidden" name="current_slug" value={product.slug} /></> : null}
+      <input type="hidden" name="uploaded_product_image_path" value={uploadedImagePath ?? ""} />
 
       {feedback?.tone === "success" ? (
         <div ref={successToastRef} className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[100] mx-auto max-w-lg md:inset-x-auto md:end-6 md:w-[min(28rem,calc(100vw-3rem))]">
@@ -417,12 +505,13 @@ export function ProductForm({
             <div className={`flex min-h-40 w-full min-w-0 flex-col items-center justify-center rounded-2xl border-2 border-dashed px-2 py-4 text-center transition sm:min-h-48 sm:px-5 sm:py-7 ${isDragging ? "border-primary bg-blue-50" : "border-border bg-white"}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); acceptFile(event.dataTransfer.files[0]); }}>
               <svg aria-hidden="true" viewBox="0 0 40 40" fill="none" className="mb-2 h-7 w-7 text-primary sm:mb-3 sm:h-10 sm:w-10"><rect x="5" y="7" width="30" height="26" rx="4" stroke="currentColor" strokeWidth="1.6" /><circle cx="15" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.5" /><path d="m8 29 9-8 6 5 4-3 5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               <p className="text-[10px] font-semibold leading-4 sm:text-sm">اسحب صورة أو اخترها من جهازك</p>
-              <button type="button" onClick={() => imageInputRef.current?.click()} className="mt-2 inline-flex min-h-9 max-w-full items-center justify-center rounded-lg border border-primary px-2 text-[10px] font-semibold text-primary transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:mt-3 sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm">{selectedFile ? "استبدال الصورة" : currentImage ? "تغيير الصورة" : "إضافة صورة"}</button>
+              <button type="button" disabled={pending || uploadingImage || compressingImage} onClick={() => imageInputRef.current?.click()} className="mt-2 inline-flex min-h-9 max-w-full items-center justify-center rounded-lg border border-primary px-2 text-[10px] font-semibold text-primary transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 sm:mt-3 sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm">{selectedFile ? "استبدال الصورة" : currentImage ? "تغيير الصورة" : "إضافة صورة"}</button>
               <label htmlFor="product_image" className="sr-only">صورة المنتج بصيغة JPG أو PNG أو WebP وبحجم لا يتجاوز 5MB</label>
               <input ref={imageInputRef} id="product_image" name="product_image" type="file" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} required={willPublish && !currentImage && !selectedFile} aria-required={willPublish} aria-describedby={fieldErrors.image ? "product-image-error" : "product-image-hint"} aria-invalid={Boolean(fieldErrors.image)} className="sr-only" onChange={(event) => acceptFile(event.currentTarget.files?.[0])} />
             </div>
             {fieldErrors.image ? <p id="product-image-error" className="text-sm font-medium text-error" role="alert">{fieldErrors.image}</p> : null}
-            {selectedFile ? <button type="button" onClick={() => { selectedFileRef.current = null; setSelectedFile(null); if (imageInputRef.current) imageInputRef.current.value = ""; clearFieldError("image"); }} className="inline-flex min-h-9 w-full min-w-0 items-center justify-center whitespace-normal rounded-lg border border-border bg-white px-2 text-center text-[10px] font-semibold leading-4 text-muted transition hover:bg-slate-50 hover:text-text sm:text-xs">{currentImage ? "إلغاء التغيير والعودة للصورة الحالية" : "إزالة الصورة المختارة"}</button> : null}
+            {compressingImage ? <p role="status" className="text-center text-[10px] font-medium leading-4 text-primary sm:text-xs">يجري تجهيز الصورة لتناسب الرفع...</p> : null}
+            {selectedFile ? <button type="button" disabled={pending || uploadingImage || compressingImage} onClick={clearSelectedImage} className="inline-flex min-h-9 w-full min-w-0 items-center justify-center whitespace-normal rounded-lg border border-border bg-white px-2 text-center text-[10px] font-semibold leading-4 text-muted transition hover:bg-slate-50 hover:text-text disabled:opacity-60 sm:text-xs">{currentImage ? "إلغاء التغيير والعودة للصورة الحالية" : "إزالة الصورة المختارة"}</button> : null}
           </div>
 
           <div className="grid min-w-0 max-w-full gap-2 sm:grid-cols-2 sm:gap-3">
@@ -470,9 +559,9 @@ export function ProductForm({
       <footer className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white/95 p-3 shadow-lg backdrop-blur sm:px-5">
         <p className="text-xs text-muted">{product?.updated_at ? `آخر تعديل: ${new Intl.DateTimeFormat("ar-YE-u-nu-latn", { dateStyle: "medium", timeStyle: "short" }).format(new Date(product.updated_at))}` : "راجع البيانات والصورة قبل الحفظ."}</p>
         <div className="flex items-center gap-2">
-          <button type="button" disabled={pending} onClick={() => router.push("/admin/products")} className="min-h-11 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-text transition hover:bg-slate-50 disabled:opacity-60">إلغاء</button>
-          <button type="submit" disabled={pending || (hasSavedSuccessfully && !formDirty)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60">
-            {pending ? <><span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />جارٍ الحفظ...</> : hasSavedSuccessfully && !formDirty ? "تم الحفظ" : "حفظ المنتج"}
+          <button type="button" disabled={pending || uploadingImage || compressingImage} onClick={() => { if (uploadedImagePath) void discardProductImageUpload(uploadedImagePath); router.push("/admin/products"); }} className="min-h-11 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-text transition hover:bg-slate-50 disabled:opacity-60">إلغاء</button>
+          <button type="submit" disabled={pending || uploadingImage || compressingImage || (hasSavedSuccessfully && !formDirty)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60">
+            {compressingImage ? <><span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />جارٍ تجهيز الصورة...</> : uploadingImage ? <><span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />جارٍ رفع الصورة...</> : pending ? <><span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />جارٍ حفظ المنتج...</> : hasSavedSuccessfully && !formDirty ? "تم الحفظ" : "حفظ المنتج"}
           </button>
         </div>
       </footer>

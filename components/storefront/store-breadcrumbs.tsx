@@ -40,16 +40,19 @@ export function StoreBreadcrumbs() {
   const [cartOrigin, setCartOrigin] = useState<CartOrigin | null>(null);
 
   useEffect(() => {
-    if (pathname !== "/cart") {
-      setCartOrigin(null);
-      return;
-    }
-    try {
-      const stored = window.sessionStorage.getItem(CART_ORIGIN_KEY);
-      setCartOrigin(stored ? JSON.parse(stored) as CartOrigin : null);
-    } catch {
-      setCartOrigin(null);
-    }
+    const frame = window.requestAnimationFrame(() => {
+      if (pathname !== "/cart") {
+        setCartOrigin(null);
+        return;
+      }
+      try {
+        const stored = window.sessionStorage.getItem(CART_ORIGIN_KEY);
+        setCartOrigin(stored ? JSON.parse(stored) as CartOrigin : null);
+      } catch {
+        setCartOrigin(null);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
 
   if (pathname === "/" || pathname === "/products" || pathname.startsWith("/products/")) return null;

@@ -64,8 +64,7 @@ export function ProductPurchase({
 
   function buySelectedItem() {
     if (!optionsAvailable) return;
-    const item = currentItem();
-    sessionStorage.setItem("taiz-printer-direct-purchase", JSON.stringify(item));
+    sessionStorage.setItem("taiz-printer-direct-purchase", JSON.stringify(currentItem()));
     router.push("/checkout");
   }
 
@@ -113,7 +112,7 @@ export function ProductPurchase({
         <button
           type="button"
           disabled={!optionsAvailable}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-primary/35 bg-white px-4 py-3 font-semibold text-primary transition-colors duration-150 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-700 active:bg-teal-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover hover:shadow active:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
           onClick={addSelectedItem}
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="M3.5 4.5h2l2.1 10.1a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.5L21 8H6.2M10 20a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM13.5 9.5v5m-2.5-2.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -122,7 +121,7 @@ export function ProductPurchase({
         <button
           type="button"
           disabled={!optionsAvailable}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-primary-hover hover:shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-primary/35 bg-white px-4 py-3 font-semibold text-primary transition-colors duration-150 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
           onClick={buySelectedItem}
         >
           اشتر الآن <span aria-hidden="true">←</span>
@@ -134,11 +133,11 @@ export function ProductPurchase({
         <div className="mx-auto w-full max-w-xl space-y-2 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
           <QuantityStepper quantity={quantity} onChange={setQuantity} className="h-11 w-full" />
           <div className="grid grid-cols-2 gap-2">
-          <button type="button" disabled={!optionsAvailable} onClick={addSelectedItem} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-primary/35 bg-white px-2 text-sm font-semibold text-primary transition-colors hover:border-teal-600 hover:bg-teal-50 hover:text-teal-700 active:bg-teal-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" disabled={!optionsAvailable} onClick={addSelectedItem} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover active:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M3.5 4.5h2l2.1 10.1a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.5L21 8H6.2M10 20a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM13.5 9.5v5m-2.5-2.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             أضف للسلة
           </button>
-          <button type="button" disabled={!optionsAvailable} onClick={buySelectedItem} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">اشتر الآن <span aria-hidden="true">←</span></button>
+          <button type="button" disabled={!optionsAvailable} onClick={buySelectedItem} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-primary/35 bg-white px-2 text-sm font-semibold text-primary transition-colors hover:border-teal-600 hover:bg-teal-50 hover:text-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">اشتر الآن <span aria-hidden="true">←</span></button>
           </div>
         </div>
       </div>

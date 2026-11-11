@@ -66,13 +66,16 @@ export function CheckoutForm({
   const idempotencyKey = useRef<string | null>(null);
   const [proofUpload, setProofUpload] = useState<ProofUploadState>({ status: "idle" });
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("taiz-printer-direct-purchase");
-      if (stored) setDirectItem(JSON.parse(stored) as CartItem);
-    } catch {
-      sessionStorage.removeItem("taiz-printer-direct-purchase");
-    }
-    setDirectReady(true);
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const stored = sessionStorage.getItem("taiz-printer-direct-purchase");
+        if (stored) setDirectItem(JSON.parse(stored) as CartItem);
+      } catch {
+        sessionStorage.removeItem("taiz-printer-direct-purchase");
+      }
+      setDirectReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
   useEffect(() => {
     const path = proofUpload.path;
@@ -86,7 +89,7 @@ export function CheckoutForm({
   }, []);
 
   const area = areas.find((row) => row.id === areaId);
-  const checkoutItems = directItem ? [directItem] : items;
+  const checkoutItems = useMemo(() => directItem ? [directItem] : items, [directItem, items]);
   const compatibleAccounts = accounts.filter((row) => row.currency_code === currency);
   const selectedAccount =
     compatibleAccounts.find((row) => row.id === accountId) ?? compatibleAccounts[0];
