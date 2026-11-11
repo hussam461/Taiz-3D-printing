@@ -4,7 +4,7 @@ export default async function FaqPage() {
   const items = await getFaq();
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-2xl font-semibold">الأسئلة الشائعة</h1>
+      <div><h1 className="text-2xl font-semibold">الأسئلة الشائعة</h1><p className="mt-2 text-sm text-muted">اضغط على أي سؤال لعرض إجابته.</p></div>
       {items.length === 0 ? (
         <p className="text-muted">لا توجد أسئلة منشورة بعد.</p>
       ) : (

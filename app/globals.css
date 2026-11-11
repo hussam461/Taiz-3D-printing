@@ -95,6 +95,14 @@ body {
   box-shadow: none;
 }
 
+.storefront-shell :is(a[href], button):active {
+  opacity: 0.78;
+}
+
+.storefront-shell a[href]:active {
+  transform: scale(0.998);
+}
+
 summary {
   list-style: none;
 }
@@ -105,6 +113,24 @@ summary {
 
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+.storefront-color-options {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139 / 55%) transparent;
+}
+
+.storefront-color-options::-webkit-scrollbar {
+  height: 5px;
+}
+
+.storefront-color-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.storefront-color-options::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(100 116 139 / 55%);
 }
 
 @keyframes cart-toast-progress {

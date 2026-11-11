@@ -9,6 +9,7 @@ export default async function Page() {
       <h1 className="mb-2 text-2xl font-semibold">الأسئلة الشائعة</h1>
       <p className="mb-4 text-sm text-muted">ترتيب الأسئلة يُحدّث تلقائيًا حسب الإضافة، ولا يحتاج إلى إدخال يدوي.</p>
       <SimpleCrud
+        polished
         table="faq_items"
         rows={data ?? []}
         fields={[

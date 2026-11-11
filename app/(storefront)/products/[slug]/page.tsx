@@ -9,6 +9,8 @@ import { formatOldYer } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import type { Specification } from "@/types/domain";
 import Image from "next/image";
+import { ScrollTopOnMount } from "@/components/storefront/scroll-top";
+import { productDescriptionToText, sanitizeProductDescriptionMarkup } from "@/lib/validation/product";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -18,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const mainImage = images.find((item) => item.is_main) ?? images[0];
   const imageUrl = mainImage ? publicMediaUrl(mainImage.storage_path) : null;
   const title = product.seo_title?.trim() || product.name;
-  const description = product.seo_description?.trim() || product.description || `تعرّف على ${product.name} من Taiz 3D Printing.`;
+  const description = product.seo_description?.trim() || productDescriptionToText(product.description ?? "") || `تعرّف على ${product.name} من Taiz 3D Printing.`;
   return {
     title,
     description: description.slice(0, 160),
@@ -62,6 +64,7 @@ export default async function ProductPage({
   const specs = (product.specifications ?? []) as Specification[];
   return (
     <div className="space-y-5 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <ScrollTopOnMount />
       <nav aria-label="مسار الصفحة" className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <Link href="/" className="transition hover:text-primary">الرئيسية</Link>
         <span aria-hidden="true">›</span>
@@ -85,7 +88,7 @@ export default async function ProductPage({
         </div>
         {product.description ? <section aria-labelledby="product-description-heading" className="space-y-2 border-t border-border pt-4">
           <h2 id="product-description-heading" className="text-base font-semibold">وصف المنتج</h2>
-          <p className="whitespace-pre-wrap leading-7 text-muted">{product.description}</p>
+          <div className="whitespace-pre-wrap leading-7 text-muted [&_p]:my-2 [&_strong]:font-bold [&_b]:font-bold [&_em]:italic [&_i]:italic [&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6" dangerouslySetInnerHTML={{ __html: sanitizeProductDescriptionMarkup(product.description) }} />
         </section> : null}
         {specs.length > 0 ? (
           <section aria-labelledby="product-specifications-heading" className="space-y-2 border-t border-border pt-4">

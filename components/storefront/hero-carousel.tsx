@@ -12,6 +12,8 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   const [interacting, setInteracting] = useState(false);
   const activeIndexRef = useRef(0);
   const transitionTimeout = useRef<number | null>(null);
+  const pointerStartX = useRef<number | null>(null);
+  const suppressClick = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const multiple = slides.length > 1;
 
@@ -54,7 +56,23 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
       aria-label="العروض والخدمات الرئيسية"
       aria-roledescription="معرض شرائح"
       aria-live="off"
-      className="group relative isolate h-auto aspect-[2.56/1] overflow-hidden bg-navy sm:aspect-auto sm:h-[clamp(28rem,34.4vw,41.25rem)]"
+      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-navy sm:aspect-auto sm:h-[clamp(28rem,34.4vw,41.25rem)]"
+      onPointerDown={(event) => { pointerStartX.current = event.clientX; suppressClick.current = false; }}
+      onPointerUp={(event) => {
+        if (pointerStartX.current === null) return;
+        const distance = event.clientX - pointerStartX.current;
+        pointerStartX.current = null;
+        if (Math.abs(distance) < 45) return;
+        suppressClick.current = true;
+        goTo(activeIndexRef.current + (distance < 0 ? 1 : -1));
+      }}
+      onPointerCancel={() => { pointerStartX.current = null; }}
+      onClickCapture={(event) => {
+        if (!suppressClick.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        suppressClick.current = false;
+      }}
       onMouseEnter={() => setInteracting(true)}
       onMouseLeave={() => setInteracting(false)}
       onFocus={() => setInteracting(true)}
