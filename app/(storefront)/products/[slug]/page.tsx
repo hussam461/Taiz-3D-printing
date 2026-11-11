@@ -9,7 +9,6 @@ import { formatOldYer } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import type { Specification } from "@/types/domain";
 import Image from "next/image";
-import { ScrollTopOnMount } from "@/components/storefront/scroll-top";
 import { productDescriptionToText, sanitizeProductDescriptionMarkup } from "@/lib/validation/product";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -63,8 +62,7 @@ export default async function ProductPage({
   const image = images.find((item) => item.is_main) ?? images[0] ?? null;
   const specs = (product.specifications ?? []) as Specification[];
   return (
-    <div className="space-y-5 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
-      <ScrollTopOnMount />
+    <div className="min-w-0 max-w-full space-y-5 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
       <nav aria-label="مسار الصفحة" className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <Link href="/" className="transition hover:text-primary">الرئيسية</Link>
         <span aria-hidden="true">›</span>
@@ -72,13 +70,13 @@ export default async function ProductPage({
         <span aria-hidden="true">›</span>
         <span aria-current="page" className="font-medium text-text">{product.name}</span>
       </nav>
-      <div className="grid gap-8 lg:grid-cols-[1.3fr_1fr]">
-      <div>
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[1.3fr_1fr]">
+      <div className="min-w-0">
         <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-border bg-white">
           {image ? (() => { const src = publicMediaUrl(image.storage_path); return src ? <Image src={src} alt={image.alt_text ?? product.name} fill sizes="(max-width: 1024px) 100vw, 55vw" unoptimized className="object-contain" /> : null; })() : null}
         </div>
       </div>
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <h1 className="text-3xl font-semibold">{product.name}</h1>
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-semibold text-navy">{formatOldYer(priced.unitFinalPriceOldYer)}</span>

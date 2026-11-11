@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type FeedbackTone = "success" | "error" | "warning" | "info";
 
@@ -20,6 +20,7 @@ export function FeedbackNotice({
   onFocus,
   onBlur,
   autoDismissMs,
+  clearQueryParam,
   className = "",
 }: {
   tone: FeedbackTone;
@@ -30,18 +31,27 @@ export function FeedbackNotice({
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
   onBlur?: React.FocusEventHandler<HTMLDivElement>;
   autoDismissMs?: number;
+  clearQueryParam?: string;
   className?: string;
 }) {
   const style = styles[tone];
   const [dismissed, setDismissed] = useState(false);
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    onDismiss?.();
+    if (clearQueryParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(clearQueryParam);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+  }, [clearQueryParam, onDismiss]);
   useEffect(() => {
-    if (!autoDismissMs) return;
+    if (!autoDismissMs || dismissed) return;
     const timer = window.setTimeout(() => {
-      setDismissed(true);
-      onDismiss?.();
+      dismiss();
     }, autoDismissMs);
     return () => window.clearTimeout(timer);
-  }, [autoDismissMs, onDismiss]);
+  }, [autoDismissMs, dismissed, dismiss]);
   if (dismissed) return null;
   return (
     <div
@@ -63,8 +73,8 @@ export function FeedbackNotice({
         <span className="me-1 font-semibold">{style.label}:</span>
         <span>{message}</span>
       </div>
-      {onDismiss ? (
-        <button type="button" onClick={() => { setDismissed(true); onDismiss(); }} aria-label="إغلاق الإشعار" className="-me-1 -mt-1 rounded-lg p-1 text-current/70 transition hover:bg-black/5 hover:text-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+      {onDismiss || autoDismissMs ? (
+        <button type="button" onClick={dismiss} aria-label="إغلاق الإشعار" className="-me-1 -mt-1 rounded-lg p-1 text-current/70 transition hover:bg-black/5 hover:text-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
           <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
         </button>
       ) : null}

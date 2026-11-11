@@ -46,7 +46,7 @@ export default async function AdminProductsPage({
 
       <ProductFilters categories={categories ?? []} values={params} />
 
-      {params.saved === "created" || params.saved === "updated" ? <FeedbackNotice tone="success" message={params.saved === "created" ? "تم إنشاء المنتج بنجاح." : "تم تحديث المنتج بنجاح."} autoDismissMs={4000} onDismiss={() => {}} /> : null}
+      {params.saved === "created" || params.saved === "updated" ? <FeedbackNotice tone="success" message={params.saved === "created" ? "تم إنشاء المنتج بنجاح." : "تم تحديث المنتج بنجاح."} autoDismissMs={4000} clearQueryParam="saved" /> : null}
 
       {productsError ? <section role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-900">تعذر تحميل قائمة المنتجات. حدّث الصفحة، وإذا استمرت المشكلة فتحقق من اتصال قاعدة البيانات.</section> : null}
       <div className="text-sm text-muted">{count ?? 0} منتج</div>

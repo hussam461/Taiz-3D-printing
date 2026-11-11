@@ -58,7 +58,7 @@ export default async function HomePage() {
           <p className="text-sm font-semibold text-primary">لديك فكرة مختلفة؟</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">نحوّل تصميمك إلى قطعة مطبوعة</h2>
           <p className="mt-2 text-sm leading-7 text-muted">
-            أرسل فكرتك أو ملفك؛ نراجع إمكانية التنفيذ والتكلفة ومدة الإنتاج معك قبل بدء العمل.
+            أرسل فكرتك أو ملفك، وسنراجع إمكانية تنفيذه ونوضح لك التكلفة والمدة المتوقعتين قبل بدء الإنتاج.
           </p>
         </div>
         <Link href="/custom-order" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">

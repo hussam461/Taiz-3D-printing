@@ -24,7 +24,7 @@ export function StoreHeader({
   announcement: { enabled: boolean; text: string; buttonLabel: string; href: string; scope: "all" | "home"; buttonEnabled: boolean };
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-white shadow-sm shadow-slate-900/[0.03]">
+    <header className="sticky top-0 z-40 w-full self-stretch border-b border-border/80 bg-white shadow-sm shadow-slate-900/[0.03]">
       <AnnouncementBar {...announcement} />
       <div className="mx-auto flex min-h-[4.25rem] w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-6 lg:px-8 xl:h-[4.75rem] xl:flex-nowrap xl:py-0">
         <form action="/products" role="search" autoComplete="off" className="order-1 flex h-10 w-full basis-full items-center gap-2 rounded-full border border-border bg-slate-50 px-2 focus-within:border-slate-400 focus-within:shadow-sm sm:h-11 xl:order-3 xl:h-10 xl:w-72 xl:basis-auto 2xl:w-80">

@@ -162,28 +162,83 @@ type ProductActionState =
   | { ok: true; productId: string; created: boolean }
   | { ok: false; error: string; fieldErrors?: import("@/lib/validation/product").ProductFieldErrors };
 
+export async function createProductImageUploadUrl(mimeType: string, size: number) {
+  try {
+    const { user } = await requireAdmin();
+    const metadataError = validateProductImageMetadata({ type: mimeType, size });
+    if (metadataError) return { ok: false as const, error: metadataError };
+    const path = `product-uploads/${user.id}/${crypto.randomUUID()}.${productImageExtension(mimeType)}`;
+    const supabase = await createServerSupabase();
+    const { data, error } = await supabase.storage.from("product-images").createSignedUploadUrl(path);
+    if (error || !data?.token) {
+      console.error("Product image upload URL creation failed", { error });
+      return { ok: false as const, error: "تعذر تجهيز رفع الصورة. تحقق من الاتصال ثم حاول مرة أخرى." };
+    }
+    return { ok: true as const, path, token: data.token };
+  } catch (error) {
+    const digest = (error as { digest?: string } | null)?.digest;
+    if (digest?.startsWith("NEXT_REDIRECT")) throw error;
+    console.error("Product image upload URL creation threw", { error });
+    return { ok: false as const, error: "تعذر تجهيز رفع الصورة. تحقق من الاتصال ثم حاول مرة أخرى." };
+  }
+}
+
+export async function discardProductImageUpload(path: string) {
+  try {
+    const { user } = await requireAdmin();
+    const prefix = `product-uploads/${user.id}/`;
+    if (!path.startsWith(prefix) || !/^[a-f0-9-]{36}\.(?:jpg|png|webp)$/i.test(path.slice(prefix.length))) {
+      return { ok: false as const };
+    }
+    const supabase = await createServerSupabase();
+    const { data: references, error: referenceError } = await supabase.from("product_images").select("id").eq("storage_path", path).limit(1);
+    if (referenceError || references?.length) return { ok: false as const };
+    const { error } = await supabase.storage.from("product-images").remove([path]);
+    if (error) console.error("Temporary product image cleanup failed", { path, error });
+    return { ok: !error } as const;
+  } catch (error) {
+    const digest = (error as { digest?: string } | null)?.digest;
+    if (digest?.startsWith("NEXT_REDIRECT")) throw error;
+    console.error("Temporary product image cleanup threw", { error });
+    return { ok: false as const };
+  }
+}
+
 export async function upsertProduct(_previousState: ProductActionState | null, formData: FormData): Promise<ProductActionState> {
   const admin = await requireAdmin();
+  try {
   const id = String(formData.get("id") ?? "");
   const parsed = parseProductForm(formData);
   if (!parsed.success) return { ok: false, error: "راجع الحقول المحددة ثم حاول الحفظ مرة أخرى.", fieldErrors: parsed.fieldErrors };
   const data = parsed.data;
+  const uploadedImagePath = String(formData.get("uploaded_product_image_path") ?? "").trim();
   const suppliedFiles = [...formData.getAll("product_image"), ...formData.getAll("product_images")];
-  const imageFiles = suppliedFiles.filter((value): value is File => value instanceof File && value.size > 0);
-  if (imageFiles.length > 1) return { ok: false, error: "ارفع صورة واحدة فقط لهذا المنتج.", fieldErrors: { image: "يسمح بصورة واحدة فقط." } };
-  if (suppliedFiles.some((value) => value instanceof File && value.size > 0) && imageFiles.length !== 1) {
-    return { ok: false, error: "تعذر قراءة الصورة. اختر صورة أخرى.", fieldErrors: { image: "تعذر قراءة ملف الصورة." } };
+  if (suppliedFiles.some((value) => value instanceof File && value.size > 0)) {
+    return { ok: false, error: "تعذر إرسال ملف الصورة بالطريقة الجديدة. حدّث الصفحة ثم حاول مرة أخرى.", fieldErrors: { image: "أعد اختيار الصورة بعد تحديث الصفحة." } };
   }
-  const image = imageFiles[0];
-  if (image) {
-    const metadataError = validateProductImageMetadata(image);
-    if (metadataError) return { ok: false, error: metadataError, fieldErrors: { image: metadataError } };
-    if (!hasValidProductImageSignature(image.type, new Uint8Array(await image.arrayBuffer()))) {
-      return { ok: false, error: "محتوى الملف لا يطابق صيغة الصورة. اختر ملف صورة صالحًا.", fieldErrors: { image: "الملف ليس صورة صالحة." } };
+  if (uploadedImagePath) {
+    const prefix = `product-uploads/${admin.user.id}/`;
+    if (!uploadedImagePath.startsWith(prefix) || !/^[a-f0-9-]{36}\.(?:jpg|png|webp)$/i.test(uploadedImagePath.slice(prefix.length))) {
+      return { ok: false, error: "مسار الصورة غير صالح. اختر الصورة مجددًا.", fieldErrors: { image: "أعد اختيار الصورة." } };
     }
   }
 
   const supabase = await createServerSupabase();
+  let uploadedImageMimeType: string | null = null;
+  if (uploadedImagePath) {
+    const { data: storedImage, error } = await supabase.storage.from("product-images").download(uploadedImagePath);
+    if (error || !storedImage) {
+      console.error("Uploaded product image could not be verified", { error });
+      return { ok: false, error: "لم يكتمل رفع الصورة. حاول الحفظ مرة أخرى لإعادة الرفع.", fieldErrors: { image: "تعذر التحقق من الصورة المرفوعة." } };
+    }
+    uploadedImageMimeType = uploadedImagePath.endsWith(".jpg") ? "image/jpeg" : uploadedImagePath.endsWith(".png") ? "image/png" : "image/webp";
+    if (validateProductImageMetadata({ type: uploadedImageMimeType, size: storedImage.size })) {
+      return { ok: false, error: "الصورة المرفوعة تتجاوز الحجم المسموح أو صيغتها غير مدعومة.", fieldErrors: { image: "اختر صورة أصغر بصيغة JPG أو PNG أو WebP." } };
+    }
+    if (!hasValidProductImageSignature(uploadedImageMimeType, new Uint8Array(await storedImage.arrayBuffer()))) {
+      return { ok: false, error: "محتوى الملف لا يطابق صيغة الصورة. اختر صورة صالحة.", fieldErrors: { image: "الملف ليس صورة صالحة." } };
+    }
+  }
   let existingImage: { id: string; storage_path: string; is_main: boolean } | null = null;
   if (id) {
     const { data: product, error } = await supabase.from("products").select("id, slug").eq("id", id).maybeSingle();
@@ -195,8 +250,8 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
     }
     existingImage = images?.[0] ?? null;
   }
-  if (data.isActive && !image && !existingImage) return { ok: false, error: "أضف صورة للمنتج قبل نشره.", fieldErrors: { image: "الصورة مطلوبة للمنتج المنشور." } };
-  if (id && data.isActive && !image && existingImage && !existingImage.is_main) {
+  if (data.isActive && !uploadedImagePath && !existingImage) return { ok: false, error: "أضف صورة للمنتج قبل نشره.", fieldErrors: { image: "الصورة مطلوبة للمنتج المنشور." } };
+  if (id && data.isActive && !uploadedImagePath && existingImage && !existingImage.is_main) {
     const { error } = await supabase.from("product_images").update({ is_main: true, sort_order: 0 }).eq("id", existingImage.id).eq("product_id", id);
     if (error) {
       console.error("Could not promote legacy product image to the current image", { productId: id, error });
@@ -231,15 +286,8 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
     created = true;
   }
 
-  if (image) {
-    const path = `${productId}/${crypto.randomUUID()}.${productImageExtension(image.type)}`;
-    const bytes = Buffer.from(await image.arrayBuffer());
-    const { error: uploadError } = await supabase.storage.from("product-images").upload(path, bytes, { contentType: image.type, upsert: false });
-    if (uploadError) {
-      console.error("Product image upload failed", { productId, error: uploadError });
-      if (created) await supabase.from("products").delete().eq("id", productId);
-      return { ok: false, error: "تعذر رفع الصورة. تحقق من الاتصال وحاول مرة أخرى.", fieldErrors: { image: "فشل رفع الصورة." } };
-    }
+  if (uploadedImagePath && uploadedImageMimeType) {
+    const path = uploadedImagePath;
     let imageWriteError: { message: string; code?: string } | null = null;
     if (existingImage) {
       const { error } = await supabase.from("product_images").update({ storage_path: path, is_main: true, sort_order: 0 }).eq("id", existingImage.id).eq("product_id", productId);
@@ -250,8 +298,6 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
     }
     if (imageWriteError) {
       console.error("Product image record write failed", { productId, error: imageWriteError });
-      const { error: cleanupError } = await supabase.storage.from("product-images").remove([path]);
-      if (cleanupError) console.error("Orphan product image cleanup failed", { productId, path, error: cleanupError });
       if (created) await supabase.from("products").delete().eq("id", productId);
       return { ok: false, error: "تم حفظ بيانات المنتج لكن تعذر ربط الصورة. أعد المحاولة أو تواصل مع الدعم.", fieldErrors: { image: "تعذر ربط الصورة بالمنتج." } };
     }
@@ -264,6 +310,12 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
   revalidatePath("/admin/products");
   revalidatePath("/products");
   return { ok: true, productId, created };
+  } catch (error) {
+    const digest = (error as { digest?: string } | null)?.digest;
+    if (digest?.startsWith("NEXT_REDIRECT")) throw error;
+    console.error("Product save action threw", { productId: String(formData.get("id") ?? "new"), error });
+    return { ok: false, error: "حدث خطأ مؤقت أثناء حفظ المنتج. بياناتك ما زالت في النموذج؛ حاول مرة أخرى." };
+  }
 }
 
 export async function deactivateProduct(id: string) {
