@@ -50,7 +50,7 @@ export function SimpleCrud({ table, rows, fields, polished = false }: { table: s
   }
 
   const createAction = saveSimpleRow.bind(null, table);
-  const entityName = table === "colors" ? "اللون" : table === "materials" ? "الخامة" : table === "delivery_areas" ? "منطقة التوصيل" : table === "payment_accounts" ? "حساب الدفع" : "العنصر";
+  const entityName = table === "colors" ? "اللون" : table === "materials" ? "الخامة" : table === "delivery_areas" ? "منطقة التوصيل" : table === "payment_accounts" ? "حساب الدفع" : table === "faq_items" ? "السؤال" : "العنصر";
 
   return (
     <div className="space-y-8">
@@ -81,7 +81,7 @@ export function SimpleCrud({ table, rows, fields, polished = false }: { table: s
 
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">إدارة المحتوى</p><h2 className="mt-1 text-xl font-bold">{table === "colors" ? "الألوان الحالية" : table === "materials" ? "الخامات الحالية" : table === "delivery_areas" ? "مناطق التوصيل الحالية" : "العناصر الحالية"}</h2></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">إدارة المحتوى</p><h2 className="mt-1 text-xl font-bold">{table === "colors" ? "الألوان الحالية" : table === "materials" ? "الخامات الحالية" : table === "delivery_areas" ? "مناطق التوصيل الحالية" : table === "faq_items" ? "الأسئلة الحالية" : "العناصر الحالية"}</h2></div>
           <div className="flex min-w-0 items-center gap-2 sm:w-auto">
             {table === "delivery_areas" ? <input type="search" value={search} onChange={(event) => setSearch(event.currentTarget.value)} aria-label="البحث عن منطقة توصيل باسم المحافظة" placeholder="ابحث باسم المحافظة..." className="min-h-10 min-w-0 flex-1 rounded-xl border border-border bg-white px-3 text-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/15 sm:w-64 sm:flex-none" /> : null}
             <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-muted">{table === "delivery_areas" && search.trim() ? `${visibleRows.length} من ${rows.length}` : rows.length} عنصر</span>

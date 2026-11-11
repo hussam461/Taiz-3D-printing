@@ -14,7 +14,7 @@ export default async function StorefrontLayout({
   return (
     <CartProvider>
       <div className="storefront-shell flex min-h-full flex-1 flex-col">
-        <StoreHeader storeName={store.store_name} logoUrl={publicMediaUrl(store.logo_path, "store-assets")} cartSlot={<CartLink />} />
+        <StoreHeader storeName={store.store_name} logoUrl={publicMediaUrl(store.logo_path, "store-assets")} cartSlot={<CartLink />} announcement={{ enabled: store.announcement_enabled, text: store.announcement_text, buttonLabel: store.announcement_button_label, href: store.announcement_href, scope: store.announcement_scope === "home" ? "home" : "all", buttonEnabled: store.announcement_button_enabled !== false }} />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
           <StoreBreadcrumbs />
           {children}

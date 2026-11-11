@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 type FeedbackTone = "success" | "error" | "warning" | "info";
 
 const styles: Record<FeedbackTone, { container: string; icon: string; label: string }> = {
@@ -17,6 +19,7 @@ export function FeedbackNotice({
   onMouseLeave,
   onFocus,
   onBlur,
+  autoDismissMs,
   className = "",
 }: {
   tone: FeedbackTone;
@@ -26,9 +29,20 @@ export function FeedbackNotice({
   onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
   onBlur?: React.FocusEventHandler<HTMLDivElement>;
+  autoDismissMs?: number;
   className?: string;
 }) {
   const style = styles[tone];
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    if (!autoDismissMs) return;
+    const timer = window.setTimeout(() => {
+      setDismissed(true);
+      onDismiss?.();
+    }, autoDismissMs);
+    return () => window.clearTimeout(timer);
+  }, [autoDismissMs, onDismiss]);
+  if (dismissed) return null;
   return (
     <div
       className={`flex items-start gap-3 rounded-xl border p-4 text-sm leading-6 ${style.container} ${className}`}
@@ -50,7 +64,7 @@ export function FeedbackNotice({
         <span>{message}</span>
       </div>
       {onDismiss ? (
-        <button type="button" onClick={onDismiss} aria-label="إغلاق الإشعار" className="-me-1 -mt-1 rounded-lg p-1 text-current/70 transition hover:bg-black/5 hover:text-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+        <button type="button" onClick={() => { setDismissed(true); onDismiss(); }} aria-label="إغلاق الإشعار" className="-me-1 -mt-1 rounded-lg p-1 text-current/70 transition hover:bg-black/5 hover:text-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
           <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
         </button>
       ) : null}

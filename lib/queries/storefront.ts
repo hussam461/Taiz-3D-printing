@@ -141,6 +141,12 @@ export async function getStorefrontContext() {
         logo_path: null as string | null,
          all_products_image_path: null as string | null,
          custom_order_image_path: null as string | null,
+        announcement_enabled: true,
+        announcement_text: "عروض جديدة ومنتجات مميزة بانتظارك",
+        announcement_button_label: "تسوق الآن",
+        announcement_href: "/products",
+        announcement_scope: "all",
+        announcement_button_enabled: true,
         deposit_percent: 30,
       },
       contact: {
@@ -157,7 +163,7 @@ export async function getStorefrontContext() {
     supabase.from("contact_settings").select("*").eq("id", 1).maybeSingle(),
   ]);
   return {
-    store: store ?? {
+    store: {
       store_name: "Taiz 3D Printing",
       description: "",
       hero_headline: "طباعة ثلاثية الأبعاد بتفاصيل تصنع الفرق",
@@ -165,7 +171,14 @@ export async function getStorefrontContext() {
       logo_path: null,
       all_products_image_path: null,
       custom_order_image_path: null,
+      announcement_enabled: true,
+      announcement_text: "عروض جديدة ومنتجات مميزة بانتظارك",
+      announcement_button_label: "تسوق الآن",
+      announcement_href: "/products",
+      announcement_scope: "all",
+      announcement_button_enabled: true,
       deposit_percent: 30,
+      ...(store ?? {}),
     },
     contact: contact ?? { phone: null, whatsapp: null, instagram: null, email: null },
     configured: true,

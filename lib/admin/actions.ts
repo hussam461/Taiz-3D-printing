@@ -473,6 +473,15 @@ export async function saveCategory(formData: FormData) {
   const isActive = formData.get("is_active") === "on";
   if (!name || name.length > 80) return { ok: false as const, error: "اكتب اسمًا للتصنيف لا يتجاوز 80 حرفًا." };
   if (!/^[a-z0-9-]+$/.test(slug)) return { ok: false as const, error: "تعذر تحديد رابط التصنيف. حدّث الصفحة وحاول مجددًا." };
+  let nextSortOrder = 0;
+  if (!id) {
+    const { data: lastCategory, error: sortError } = await supabase.from("categories").select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
+    if (sortError) {
+      console.error("Could not determine category sort order", { error: sortError });
+      return { ok: false as const, error: "تعذر تحديد ترتيب التصنيف الجديد. أعد المحاولة." };
+    }
+    nextSortOrder = Number(lastCategory?.sort_order ?? -1) + 1;
+  }
 
   let current: { id: string; image_path: string | null } | null = null;
   if (id) {
@@ -512,7 +521,7 @@ export async function saveCategory(formData: FormData) {
   };
   const { data: saved, error } = id
     ? await supabase.from("categories").update(payload).eq("id", id).select("id").maybeSingle()
-    : await supabase.from("categories").insert(payload).select("id").maybeSingle();
+    : await supabase.from("categories").insert({ ...payload, sort_order: nextSortOrder }).select("id").maybeSingle();
   if (error || !saved) {
     if (uploadedPath) await supabase.storage.from("store-assets").remove([uploadedPath]);
     if (error?.code === "PGRST204" || error?.code === "42703") return { ok: false as const, error: "ميزة صور التصنيفات تحتاج تحديث قاعدة البيانات. طبّق ترحيل category_images ثم أعد المحاولة." };
@@ -660,6 +669,18 @@ export async function saveStoreSettings(formData: FormData) {
     uploadedCardPaths[field.pathKey] = path;
   }
   const depositRaw = formData.get("deposit_percent");
+  const announcementHref = String(formData.get("announcement_href") ?? current?.announcement_href ?? "/products").trim();
+  const announcementScope = String(formData.get("announcement_scope") ?? current?.announcement_scope ?? "all");
+  const announcementEnabledValues = formData.getAll("announcement_enabled");
+  const announcementButtonEnabledValues = formData.getAll("announcement_button_enabled");
+  if (announcementScope !== "all" && announcementScope !== "home") {
+    await cleanupPendingImageUploads();
+    return { ok: false as const, error: "اختر نطاق ظهور صحيح للإعلان." };
+  }
+  if (announcementHref.length > 300 || (announcementHref && !announcementHref.startsWith("/") && !/^https:\/\//i.test(announcementHref)) || announcementHref.startsWith("//")) {
+    await cleanupPendingImageUploads();
+    return { ok: false as const, error: "رابط الإعلان يجب أن يكون رابطًا داخليًا أو يبدأ بـ https://." };
+  }
   const { error } = await supabase.from("store_settings").upsert({
     id: 1,
     store_name: String(formData.get("store_name") ?? current?.store_name ?? "Taiz 3D Printing"),
@@ -669,6 +690,12 @@ export async function saveStoreSettings(formData: FormData) {
     hero_description: String(formData.get("hero_description") ?? current?.hero_description ?? ""),
     all_products_image_path: uploadedCardPaths.all_products_image_path ?? (formData.get("remove_all_products_image") === "on" ? null : current?.all_products_image_path ?? null),
     custom_order_image_path: uploadedCardPaths.custom_order_image_path ?? (formData.get("remove_custom_order_image") === "on" ? null : current?.custom_order_image_path ?? null),
+    announcement_enabled: formData.has("announcement_enabled") ? announcementEnabledValues.includes("on") : current?.announcement_enabled ?? true,
+    announcement_text: String(formData.get("announcement_text") ?? current?.announcement_text ?? "عروض جديدة ومنتجات مميزة بانتظارك").trim(),
+    announcement_button_label: String(formData.get("announcement_button_label") ?? current?.announcement_button_label ?? "تسوق الآن").trim(),
+    announcement_href: announcementHref,
+    announcement_scope: announcementScope,
+    announcement_button_enabled: formData.has("announcement_button_enabled") ? announcementButtonEnabledValues.includes("on") : current?.announcement_button_enabled ?? true,
     deposit_percent:
       depositRaw == null || String(depositRaw) === ""
         ? Number(current?.deposit_percent ?? 30)

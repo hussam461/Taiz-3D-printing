@@ -88,13 +88,13 @@ export function ProductPurchase({
         </fieldset>
         {colors.length > 0 ? <fieldset className="space-y-2 rounded-xl border border-border bg-white p-3">
           <legend className="text-sm font-semibold text-text">اللون</legend>
-          <div className="max-h-32 overflow-y-auto overscroll-contain pe-2 sm:max-h-40">
-            <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-3">
+          <div className="storefront-color-options max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2 touch-pan-x">
+            <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-2 sm:gap-3">
             {orderedColors.map((color) => {
               const selected = colorId === color.id;
               const isCurrentProductColor = isCurrentProductColorOption(color.name);
               const swatch = color.hex_code && /^#[0-9a-fA-F]{6}$/.test(color.hex_code) ? color.hex_code : colorFromName(color.name);
-              return <button key={color.id} type="button" aria-pressed={selected} onClick={() => setColorId(color.id)} className={`group flex items-center justify-center gap-1 text-[11px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isCurrentProductColor ? (selected ? "min-h-7 translate-y-1 rounded-full border border-teal-600 bg-teal-50 px-2 py-0.5 text-teal-800 shadow-sm" : "min-h-7 translate-y-1 rounded-full border border-border bg-slate-50 px-2 py-0.5 text-text hover:border-teal-500 hover:bg-teal-50/60") : "min-h-16 min-w-12 flex-col rounded-lg px-2 py-1 hover:bg-slate-50"}`}>
+              return <button key={color.id} type="button" aria-pressed={selected} onClick={() => setColorId(color.id)} className={`group flex shrink-0 items-center justify-center gap-1 text-[11px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isCurrentProductColor ? (selected ? "min-h-7 translate-y-1 rounded-full border border-teal-600 bg-teal-50 px-2 py-0.5 text-teal-800 shadow-sm" : "min-h-7 translate-y-1 rounded-full border border-border bg-slate-50 px-2 py-0.5 text-text hover:border-teal-500 hover:bg-teal-50/60") : "min-h-16 min-w-12 flex-col rounded-lg px-2 py-1 hover:bg-slate-50"}`}>
                 {!isCurrentProductColor ? <span aria-hidden="true" className={`h-8 w-8 rounded-full border border-black/10 shadow-sm ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`} style={{ backgroundColor: swatch }} /> : null}
                 {isCurrentProductColor ? <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className={`h-3.5 w-3.5 shrink-0 ${selected ? "opacity-100" : "opacity-0"}`}><path d="m4.5 10.2 3.4 3.4 7.6-7.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}
                 <span className={selected ? "text-teal-800" : "text-muted"}>{color.name}</span>

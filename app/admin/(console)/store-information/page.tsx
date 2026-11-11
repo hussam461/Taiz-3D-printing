@@ -29,6 +29,17 @@ export default async function Page() {
       <SaveChangesForm action={saveStoreSettings} successMessage="تم حفظ النص الاحتياطي للصفحة الرئيسية." title="مقدمة الصفحة الرئيسية" description="هذا نص احتياطي للبانر. لا يظهر ما دامت هناك شريحة منشورة؛ يظهر عند عدم وجود شرائح منشورة، مثلًا بعد حذفها أو إلغاء نشرها." buttonLabel="حفظ التعديلات">
           <div className="grid gap-4"><label className="text-sm font-semibold">العنوان الرئيسي<input name="hero_headline" defaultValue={data?.hero_headline ?? ""} placeholder="نصنع أفكارك بدقة" className={input} /></label><label className="text-sm font-semibold">الوصف التوضيحي<textarea name="hero_description" defaultValue={data?.hero_description ?? ""} rows={3} placeholder="اطلب منتجاتك المطبوعة حسب احتياجك..." className={`${input} resize-y`} /></label></div>
       </SaveChangesForm>
+
+      <SaveChangesForm action={saveStoreSettings} successMessage="تم حفظ شريط الإعلان." title="شريط الإعلان العلوي" description="إعلان صغير يظهر فوق الهيدر، ويظل مختصرًا على الجوال حتى لا يأخذ مساحة كبيرة." buttonLabel="حفظ التعديلات">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-50 px-3 text-sm font-semibold sm:col-span-2"><input type="hidden" name="announcement_enabled" value="off" /><input name="announcement_enabled" type="checkbox" value="on" defaultChecked={data?.announcement_enabled !== false} className="h-4 w-4 accent-teal-600" />إظهار شريط الإعلان للعملاء</label>
+          <label className="text-sm font-semibold sm:col-span-2">نص الإعلان<input name="announcement_text" maxLength={140} defaultValue={data?.announcement_text ?? "عروض جديدة ومنتجات مميزة بانتظارك"} placeholder="خصم 10% لفترة محدودة" className={input} /></label>
+          <label className="text-sm font-semibold">نص الزر<input name="announcement_button_label" maxLength={40} defaultValue={data?.announcement_button_label ?? "تسوق الآن"} placeholder="تسوق الآن" className={input} /></label>
+          <label className="text-sm font-semibold">رابط الزر<input name="announcement_href" maxLength={300} dir="ltr" defaultValue={data?.announcement_href ?? "/products"} placeholder="/products" className={input} /></label>
+          <label className="text-sm font-semibold">مكان الظهور<select name="announcement_scope" defaultValue={data?.announcement_scope ?? "all"} className={input}><option value="all">جميع الصفحات</option><option value="home">الصفحة الرئيسية فقط</option></select></label>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-50 px-3 text-sm font-semibold"><input type="hidden" name="announcement_button_enabled" value="off" /><input name="announcement_button_enabled" type="checkbox" value="on" defaultChecked={data?.announcement_button_enabled !== false} className="h-4 w-4 accent-teal-600" />إظهار زر الإعلان</label>
+        </div>
+      </SaveChangesForm>
     </div>
   );
 }

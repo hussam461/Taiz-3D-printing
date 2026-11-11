@@ -9,6 +9,7 @@ import { publicMediaUrl } from "@/lib/storage/public-url";
 import {
   PRODUCT_IMAGE_MIME_TYPES,
   parseProductForm,
+  sanitizeProductDescriptionMarkup,
   validateProductImageMetadata,
   type ProductFieldErrors,
 } from "@/lib/validation/product";
@@ -116,8 +117,11 @@ export function ProductForm({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [hasSavedSuccessfully, setHasSavedSuccessfully] = useState(createdNotice);
   const [formDirty, setFormDirty] = useState(false);
+  const initialDescriptionMarkup = sanitizeProductDescriptionMarkup(product?.description ?? "");
+  const [descriptionMarkup, setDescriptionMarkup] = useState(initialDescriptionMarkup);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const [willPublish, setWillPublish] = useState(product?.is_active ?? false);
   const [specRows, setSpecRows] = useState<SpecRow[]>(() => initialSpecifications(product?.specifications));
   const nextSpecId = useRef(specRows.reduce((maximum, row) => Math.max(maximum, row.id), 0) + 1);
@@ -168,8 +172,7 @@ export function ProductForm({
         setSelectedFile(null);
         setPreviewUrl(null);
         if (imageInputRef.current) imageInputRef.current.value = "";
-        if (actionState.created) router.replace(`/admin/products/${actionState.productId}?saved=created`);
-        else setFeedback({ tone: "success", message: "تم تحديث المنتج بنجاح." });
+        router.replace(`/admin/products?saved=${actionState.created ? "created" : "updated"}`);
         router.refresh();
         return;
       }
@@ -203,7 +206,7 @@ export function ProductForm({
   }, [actionState, router]);
 
   function focusField(name: string) {
-    const target = name === "image" ? imageInputRef.current : document.getElementById(name);
+    const target = name === "image" ? imageInputRef.current : name === "description" ? descriptionEditorRef.current : document.getElementById(name);
     target?.focus();
   }
 
@@ -236,6 +239,25 @@ export function ProductForm({
     setSelectedFile(file);
     setFormDirty(true);
     clearFieldError("image");
+  }
+
+  function syncDescription() {
+    const editor = descriptionEditorRef.current;
+    if (!editor) return;
+    setDescriptionMarkup(editor.innerHTML);
+    setFormDirty(true);
+    clearFieldError("description");
+  }
+
+  function pasteDescription(event: React.ClipboardEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const html = event.clipboardData.getData("text/html");
+    const text = event.clipboardData.getData("text/plain");
+    const safeContent = html
+      ? sanitizeProductDescriptionMarkup(html)
+      : sanitizeProductDescriptionMarkup(text.replace(/\r\n?|\n/g, "<br>"));
+    document.execCommand("insertHTML", false, safeContent);
+    syncDescription();
   }
 
   function rememberValues(form: HTMLFormElement) {
@@ -348,18 +370,21 @@ export function ProductForm({
             {categories.length === 0 ? <p className="text-xs text-warning">لا توجد تصنيفات متاحة. أنشئ تصنيفًا أولًا قبل حفظ المنتج.</p> : null}
           </Field>
           <Field id="description" label="وصف المنتج" required error={fieldErrors.description} className="col-span-2">
-            <textarea id="description" name="description" defaultValue={product?.description ?? ""} required rows={3} maxLength={5000} aria-required="true" aria-invalid={Boolean(fieldErrors.description)} aria-describedby={fieldErrors.description ? "description-error" : undefined} placeholder="اكتب وصف المنتج" className={inputClass} onChange={() => clearFieldError("description")} />
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
+              <div ref={descriptionEditorRef} id="description-editor" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="وصف المنتج" aria-required="true" aria-invalid={Boolean(fieldErrors.description)} aria-describedby={fieldErrors.description ? "description-error" : undefined} onInput={syncDescription} onPaste={pasteDescription} className="min-h-36 max-h-96 overflow-y-auto whitespace-pre-wrap break-words px-3.5 py-3 text-sm leading-7 text-text outline-none empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-['اكتب_وصف_المنتج'] [&_p]:my-2 [&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6" dangerouslySetInnerHTML={{ __html: initialDescriptionMarkup }} />
+              <textarea id="description" name="description" value={descriptionMarkup} readOnly required aria-hidden="true" tabIndex={-1} className="sr-only" />
+            </div>
           </Field>
-          <div className="col-span-2 grid grid-cols-2 items-start gap-3 sm:gap-4">
-            <Field id="base_price_old_yer" label="السعر الأساسي" required error={fieldErrors.base_price_old_yer}>
+          <div className="col-span-2 grid grid-cols-2 items-start gap-2 sm:gap-4">
+            <Field id="base_price_old_yer" label="السعر" required error={fieldErrors.base_price_old_yer}>
               <div className="relative">
-              <input id="base_price_old_yer" name="base_price_old_yer" type="number" inputMode="numeric" min={0} step={1} required defaultValue={product?.base_price_old_yer ?? ""} aria-required="true" aria-invalid={Boolean(fieldErrors.base_price_old_yer)} aria-describedby={fieldErrors.base_price_old_yer ? "base_price_old_yer-error" : undefined} placeholder="أدخل السعر" className={`${inputClass} pe-24`} onChange={() => clearFieldError("base_price_old_yer")} />
+              <input id="base_price_old_yer" name="base_price_old_yer" type="number" inputMode="numeric" min={0} step={1} required defaultValue={product?.base_price_old_yer ?? ""} aria-required="true" aria-invalid={Boolean(fieldErrors.base_price_old_yer)} aria-describedby={fieldErrors.base_price_old_yer ? "base_price_old_yer-error" : undefined} placeholder="1500" className={`${inputClass} px-2.5 pe-20 text-xs sm:px-3.5 sm:pe-24 sm:text-sm`} onChange={() => clearFieldError("base_price_old_yer")} />
                 <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-[10px] text-muted sm:end-4 sm:text-xs">ر.ي قديم</span>
               </div>
             </Field>
             <Field id="discount_percent" label="نسبة الخصم" optional error={fieldErrors.discount_percent}>
               <div className="relative">
-                <input id="discount_percent" name="discount_percent" type="number" inputMode="decimal" min={0} max={100} step="0.01" defaultValue={product?.discount_percent ?? ""} aria-invalid={Boolean(fieldErrors.discount_percent)} aria-describedby={fieldErrors.discount_percent ? "discount_percent-error" : "discount_percent-hint"} placeholder="بدون خصم" className={`${inputClass} pe-10`} onChange={() => clearFieldError("discount_percent")} />
+                <input id="discount_percent" name="discount_percent" type="number" inputMode="decimal" min={0} max={100} step="0.01" defaultValue={product?.discount_percent ?? ""} aria-invalid={Boolean(fieldErrors.discount_percent)} aria-describedby={fieldErrors.discount_percent ? "discount_percent-error" : "discount_percent-hint"} placeholder="0" className={`${inputClass} px-2.5 pe-8 text-xs sm:px-3.5 sm:pe-10 sm:text-sm`} onChange={() => clearFieldError("discount_percent")} />
                 <span className="pointer-events-none absolute inset-y-0 end-4 flex items-center text-sm text-muted">٪</span>
               </div>
             </Field>
@@ -377,7 +402,7 @@ export function ProductForm({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-primary/20 bg-primary/[0.025] p-5 shadow-sm md:p-7">
+      <section className="rounded-3xl border border-primary/20 bg-primary/[0.025] p-3 shadow-sm sm:p-5 md:p-7">
         <header className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-border pb-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">وسائط المنتج</p>
@@ -386,40 +411,40 @@ export function ProductForm({
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${willPublish ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-muted"}`}>{willPublish ? "مطلوبة للنشر" : "اختيارية للمسودة"}</span>
         </header>
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <div className="space-y-3">
-            <label htmlFor="product_image" className="text-sm font-semibold">{currentImage ? "الصورة الحالية" : "اختر صورة المنتج"}{willPublish ? <span className="ms-1 text-error" aria-hidden="true">*</span> : null}</label>
-            <div className={`flex min-h-48 flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-7 text-center transition ${isDragging ? "border-primary bg-blue-50" : "border-border bg-white"}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); acceptFile(event.dataTransfer.files[0]); }}>
-              <svg aria-hidden="true" viewBox="0 0 40 40" fill="none" className="mb-3 h-10 w-10 text-primary"><rect x="5" y="7" width="30" height="26" rx="4" stroke="currentColor" strokeWidth="1.6" /><circle cx="15" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.5" /><path d="m8 29 9-8 6 5 4-3 5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <p className="text-sm font-semibold">اسحب صورة إلى هنا أو اخترها من جهازك</p>
-              <button type="button" onClick={() => imageInputRef.current?.click()} className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{currentImage ? "استبدال الصورة" : "اختيار صورة"}</button>
+        <div className="grid min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div className="min-w-0 space-y-2 sm:space-y-3">
+            <label htmlFor="product_image" className="block text-xs font-semibold leading-5 sm:text-sm">{currentImage ? "الصورة الحالية" : "اختر صورة المنتج"}{willPublish ? <span className="ms-1 text-error" aria-hidden="true">*</span> : null}</label>
+            <div className={`flex min-h-40 w-full min-w-0 flex-col items-center justify-center rounded-2xl border-2 border-dashed px-2 py-4 text-center transition sm:min-h-48 sm:px-5 sm:py-7 ${isDragging ? "border-primary bg-blue-50" : "border-border bg-white"}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); acceptFile(event.dataTransfer.files[0]); }}>
+              <svg aria-hidden="true" viewBox="0 0 40 40" fill="none" className="mb-2 h-7 w-7 text-primary sm:mb-3 sm:h-10 sm:w-10"><rect x="5" y="7" width="30" height="26" rx="4" stroke="currentColor" strokeWidth="1.6" /><circle cx="15" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.5" /><path d="m8 29 9-8 6 5 4-3 5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <p className="text-[10px] font-semibold leading-4 sm:text-sm">اسحب صورة أو اخترها من جهازك</p>
+              <button type="button" onClick={() => imageInputRef.current?.click()} className="mt-2 inline-flex min-h-9 max-w-full items-center justify-center rounded-lg border border-primary px-2 text-[10px] font-semibold text-primary transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:mt-3 sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm">{selectedFile ? "استبدال الصورة" : currentImage ? "تغيير الصورة" : "إضافة صورة"}</button>
               <label htmlFor="product_image" className="sr-only">صورة المنتج بصيغة JPG أو PNG أو WebP وبحجم لا يتجاوز 5MB</label>
               <input ref={imageInputRef} id="product_image" name="product_image" type="file" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} required={willPublish && !currentImage && !selectedFile} aria-required={willPublish} aria-describedby={fieldErrors.image ? "product-image-error" : "product-image-hint"} aria-invalid={Boolean(fieldErrors.image)} className="sr-only" onChange={(event) => acceptFile(event.currentTarget.files?.[0])} />
             </div>
             {fieldErrors.image ? <p id="product-image-error" className="text-sm font-medium text-error" role="alert">{fieldErrors.image}</p> : null}
-            {selectedFile ? <button type="button" onClick={() => { selectedFileRef.current = null; setSelectedFile(null); if (imageInputRef.current) imageInputRef.current.value = ""; clearFieldError("image"); }} className="text-sm font-semibold text-muted underline underline-offset-4 transition hover:text-text">إلغاء الاستبدال والعودة للصورة الحالية</button> : null}
+            {selectedFile ? <button type="button" onClick={() => { selectedFileRef.current = null; setSelectedFile(null); if (imageInputRef.current) imageInputRef.current.value = ""; clearFieldError("image"); }} className="inline-flex min-h-9 w-full min-w-0 items-center justify-center whitespace-normal rounded-lg border border-border bg-white px-2 text-center text-[10px] font-semibold leading-4 text-muted transition hover:bg-slate-50 hover:text-text sm:text-xs">{currentImage ? "إلغاء التغيير والعودة للصورة الحالية" : "إزالة الصورة المختارة"}</button> : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 max-w-full gap-2 sm:grid-cols-2 sm:gap-3">
             {currentImage && !selectedFile ? (
-              <figure className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+              <figure className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
                 <div className="relative aspect-[4/3] bg-slate-100">
-                  {currentImageUrl ? <Image src={currentImageUrl} alt={currentImage.alt_text || product?.name || "صورة المنتج الحالية"} fill sizes="(max-width: 768px) 100vw, 30vw" unoptimized className="object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-muted">تعذرت معاينة الصورة</div>}
-                  <span className="absolute start-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-primary shadow-sm">الصورة الحالية</span>
+                  {currentImageUrl ? <Image src={currentImageUrl} alt={currentImage.alt_text || product?.name || "صورة المنتج الحالية"} fill sizes="(max-width: 768px) 45vw, 30vw" unoptimized className="object-cover" /> : <div className="flex h-full items-center justify-center text-[10px] text-muted sm:text-sm">تعذرت معاينة الصورة</div>}
+                  <span className="absolute start-1 top-1 rounded-md bg-white/95 px-1.5 py-1 text-[8px] font-semibold text-primary shadow-sm sm:start-3 sm:top-3 sm:rounded-full sm:px-3 sm:text-xs">الحالية</span>
                 </div>
                 <figcaption className="p-3 text-xs text-muted">سيبقى الملف الحالي كما هو ما لم تختر صورة بديلة.</figcaption>
               </figure>
             ) : null}
             {selectedFile && previewUrl ? (
-              <figure className="overflow-hidden rounded-2xl border border-primary/30 bg-white shadow-sm">
+              <figure className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-primary/30 bg-white shadow-sm">
                 <div className="relative aspect-[4/3] bg-slate-100">
-                  <Image src={previewUrl} alt={`معاينة الصورة الجديدة: ${selectedFile.name}`} fill sizes="(max-width: 768px) 100vw, 30vw" unoptimized className="object-cover" />
-                  <span className="absolute start-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-primary shadow-sm">معاينة البديل</span>
+                  <div role="img" aria-label={`معاينة الصورة الجديدة: ${selectedFile.name}`} className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(previewUrl).slice(1, -1)})` }} />
+                  <span className="absolute start-1 top-1 rounded-md bg-white/95 px-1.5 py-1 text-[8px] font-semibold text-primary shadow-sm sm:start-3 sm:top-3 sm:rounded-full sm:px-3 sm:text-xs">معاينة</span>
                 </div>
                 <figcaption className="space-y-1 p-3 text-xs text-muted"><p className="truncate font-medium text-text" title={selectedFile.name}>{selectedFile.name}</p><p>{formatFileSize(selectedFile.size)} · لن تُرفع إلا عند حفظ المنتج</p></figcaption>
               </figure>
             ) : null}
-            {!currentImage && !selectedFile ? <div className="flex aspect-[4/3] flex-col items-center justify-center rounded-2xl border border-border bg-white p-4 text-center text-sm text-muted"><span className="mb-2 rounded-full bg-slate-100 p-3"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z" stroke="currentColor" strokeWidth="1.5" /><path d="m6 17 4-4 3 3 2-2 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span><span>ستظهر معاينة الصورة هنا</span></div> : null}
+            {!currentImage && !selectedFile ? <div className="box-border flex aspect-[4/3] w-full min-w-0 max-w-full flex-col items-center justify-center overflow-hidden rounded-2xl border border-border bg-white p-2 text-center text-xs text-muted sm:p-4 sm:text-sm"><span className="mb-2 shrink-0 rounded-full bg-slate-100 p-2 sm:p-3"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 sm:h-6 sm:w-6"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z" stroke="currentColor" strokeWidth="1.5" /><path d="m6 17 4-4 3 3 2-2 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span><span className="max-w-full min-w-0 break-words">ستظهر معاينة الصورة هنا</span></div> : null}
           </div>
         </div>
         {legacyImageCount > 1 ? <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-950">توجد صور قديمة إضافية لهذا المنتج. لن تظهر في الواجهة الجديدة ولن نحذفها تلقائيًا حتى لا تتأثر مراجع الطلبات السابقة.</p> : null}

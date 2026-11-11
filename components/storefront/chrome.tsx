@@ -2,6 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { MobileNavMenu } from "@/components/storefront/mobile-nav-menu";
 import { DesktopNav } from "@/components/storefront/desktop-nav";
+import { TopLink } from "@/components/storefront/top-link";
+import { AnnouncementBar } from "@/components/storefront/announcement-bar";
 
 const NAV = [
   { href: "/", label: "الرئيسية" },
@@ -14,13 +16,16 @@ export function StoreHeader({
   storeName,
   logoUrl,
   cartSlot,
+  announcement,
 }: {
   storeName: string;
   logoUrl: string | null;
   cartSlot: React.ReactNode;
+  announcement: { enabled: boolean; text: string; buttonLabel: string; href: string; scope: "all" | "home"; buttonEnabled: boolean };
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-white shadow-sm shadow-slate-900/[0.03]">
+      <AnnouncementBar {...announcement} />
       <div className="mx-auto flex min-h-[4.25rem] w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-6 lg:px-8 xl:h-[4.75rem] xl:flex-nowrap xl:py-0">
         <form action="/products" role="search" autoComplete="off" className="order-1 flex h-10 w-full basis-full items-center gap-2 rounded-full border border-border bg-slate-50 px-2 focus-within:border-slate-400 focus-within:shadow-sm sm:h-11 xl:order-3 xl:h-10 xl:w-72 xl:basis-auto 2xl:w-80">
           <label htmlFor="store-header-search" className="sr-only">ابحث عن منتج</label>
@@ -74,9 +79,9 @@ export function StoreFooter({
         <div className="max-w-md">
           <Link href="/" className="inline-flex rounded-sm text-xl font-bold tracking-tight transition hover:text-cyan-300 focus-visible:outline-white">{storeName}</Link>
           <p className="mt-3 text-sm leading-7 text-white/65">{description}</p>
-          <Link href="/products" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-navy transition hover:bg-cyan-50 focus-visible:outline-white">
+          <TopLink href="/products" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-navy transition hover:bg-cyan-50 focus-visible:outline-white">
             تصفّح المنتجات <span aria-hidden="true">←</span>
-          </Link>
+          </TopLink>
         </div>
         <div>
           <h2 className="text-sm font-semibold">تواصل معنا</h2>
