@@ -7,12 +7,14 @@ import { FeedbackNotice } from "@/components/admin/feedback-notice";
 type ActionResult = { ok: boolean; error?: string; id?: string } | null;
 type Action = (formData: FormData) => Promise<ActionResult | void>;
 
-export function ActionForm({ action, children, className, successMessage = "تم تنفيذ العملية بنجاح.", hideFeedback = false, feedbackPlacement = "inline", resetOnSuccess = false, onSuccess, onChange }: { action: Action; children: React.ReactNode; className?: string; successMessage?: string; hideFeedback?: boolean; feedbackPlacement?: "inline" | "toast"; resetOnSuccess?: boolean; onSuccess?: (result: Exclude<ActionResult, null>, submittedData: FormData) => void; onChange?: React.FormEventHandler<HTMLFormElement> }) {
+export function ActionForm({ action, children, className, successMessage = "تم تنفيذ العملية بنجاح.", hideFeedback = false, feedbackPlacement = "inline", resetOnSuccess = false, onSuccess, onChange, onSubmit, onError }: { action: Action; children: React.ReactNode; className?: string; successMessage?: string; hideFeedback?: boolean; feedbackPlacement?: "inline" | "toast"; resetOnSuccess?: boolean; onSuccess?: (result: Exclude<ActionResult, null>, submittedData: FormData) => void; onChange?: React.FormEventHandler<HTMLFormElement>; onSubmit?: React.FormEventHandler<HTMLFormElement>; onError?: (result: Exclude<ActionResult, null>) => void }) {
   const formRef = useRef<HTMLFormElement>(null);
   const valuesRef = useRef<Record<string, string | boolean>>({});
   const submittedDataRef = useRef<FormData>(new FormData());
   const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
   useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
   const [offline, setOffline] = useState(false);
   const [visibleState, setVisibleState] = useState<ActionResult>(null);
   const [state, formAction, pending] = useActionState(async (_previous: ActionResult, formData: FormData) => {
@@ -33,7 +35,7 @@ export function ActionForm({ action, children, className, successMessage = "تم
       onSuccessRef.current?.(state, submittedDataRef.current);
       formRef.current?.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach((input) => { input.value = ""; });
       if (resetOnSuccess) formRef.current?.reset();
-    }
+    } else onErrorRef.current?.(state);
     if (!state.ok && formRef.current) {
       for (const element of Array.from(formRef.current.elements)) {
         const field = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -47,7 +49,7 @@ export function ActionForm({ action, children, className, successMessage = "تم
     const timer = window.setTimeout(() => setVisibleState(null), state.ok ? 3500 : 7000);
     return () => window.clearTimeout(timer);
   }, [state, resetOnSuccess]);
-  return <form ref={formRef} action={formAction} onChange={onChange} onSubmit={() => { if (!formRef.current) return; submittedDataRef.current = new FormData(formRef.current); valuesRef.current = {}; for (const element of Array.from(formRef.current.elements)) { const field = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement; if (field.name && field.type !== "file") valuesRef.current[field.name] = field.type === "checkbox" || field.type === "radio" ? (field as HTMLInputElement).checked : field.value; } }} className={className}>{children}{hideFeedback ? null : <SubmitState pending={pending} offline={offline} state={visibleState} successMessage={successMessage} placement={feedbackPlacement} onDismiss={() => setVisibleState(null)} />}</form>;
+  return <form ref={formRef} action={formAction} onChange={onChange} onSubmit={(event) => { if (!formRef.current) return; submittedDataRef.current = new FormData(formRef.current); valuesRef.current = {}; for (const element of Array.from(formRef.current.elements)) { const field = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement; if (field.name && field.type !== "file") valuesRef.current[field.name] = field.type === "checkbox" || field.type === "radio" ? (field as HTMLInputElement).checked : field.value; } onSubmit?.(event); }} className={className}>{children}{hideFeedback ? null : <SubmitState pending={pending} offline={offline} state={visibleState} successMessage={successMessage} placement={feedbackPlacement} onDismiss={() => setVisibleState(null)} />}</form>;
 }
 
 function SubmitState({ pending, offline, state, successMessage, placement, onDismiss }: { pending: boolean; offline: boolean; state: ActionResult; successMessage: string; placement: "inline" | "toast"; onDismiss: () => void }) {

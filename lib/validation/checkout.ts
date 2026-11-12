@@ -36,7 +36,7 @@ export const checkoutPayloadSchema = z.object({
     .transform((value) => (value ? value : undefined))
     .pipe(z.string().email("البريد غير صالح").optional()),
   deliveryAreaId: z.string().uuid("اختر منطقة التوصيل"),
-  address: z.string().trim().min(8, "العنوان التفصيلي مطلوب").max(400),
+  address: z.string().trim().min(1, "العنوان التفصيلي مطلوب"),
   deliveryNotes: z.string().trim().max(400).optional().or(z.literal("")),
   paymentCurrency: z.enum(PAYMENT_CURRENCIES),
   paymentAccountId: z.string().uuid("اختر حساب التحويل"),

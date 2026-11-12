@@ -51,8 +51,8 @@ export default async function CheckoutSuccessPage({
           </a>
         ) : null}
         <div className="text-center">
-          <Link href="/products" className="text-sm font-semibold text-muted hover:text-primary">
-            العودة للمنتجات
+          <Link href="/products" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary">
+            العودة إلى المنتجات
           </Link>
         </div>
       </div>

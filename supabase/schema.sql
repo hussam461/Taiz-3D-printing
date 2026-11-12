@@ -8,10 +8,7 @@ create extension if not exists "pgcrypto";
 do $$ begin
   create type public.order_status as enum (
     'pending',
-    'confirmed',
     'in_production',
-    'ready',
-    'shipped',
     'completed',
     'cancelled'
   );
@@ -300,9 +297,13 @@ create table if not exists public.homepage_slides (
 -- ---------------------------------------------------------------------------
 -- Orders
 -- ---------------------------------------------------------------------------
+create sequence if not exists public.order_reference_seq as bigint minvalue 1 maxvalue 999999 start 1;
+grant usage on sequence public.order_reference_seq to service_role;
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
-  reference text not null unique,
+  reference text not null unique default lpad(nextval('public.order_reference_seq')::text, 6, '0'),
+  legacy_reference text,
   idempotency_key text not null unique,
   customer_name text not null,
   customer_phone text not null,
@@ -454,8 +455,8 @@ language plpgsql
 set search_path = public
 as $$
 begin
-  if new.order_status = 'shipped'
-    and old.order_status is distinct from 'shipped'
+  if new.order_status = 'completed'
+    and old.order_status is distinct from 'completed'
     and new.payment_status <> 'proof_approved' then
     raise exception 'deposit proof is not approved';
   end if;
@@ -491,7 +492,7 @@ begin
   end if;
   select * into current_order from public.orders where id = p_order_id for update;
   if not found then raise exception 'order not found'; end if;
-  if current_order.order_status not in ('ready', 'shipped') then raise exception 'order is not ready for delivery'; end if;
+  if current_order.order_status <> 'in_production' then raise exception 'order is not in production'; end if;
   if current_order.payment_status <> 'proof_approved' then raise exception 'deposit proof is not approved'; end if;
   if current_order.balance_status = 'due' then
     if current_order.remaining_old_yer <= 0 then raise exception 'no tracked balance'; end if;
@@ -534,9 +535,6 @@ declare
 begin
   if not public.is_admin() then raise exception 'not authorized'; end if;
   if p_decision is null or p_decision not in ('approved', 'rejected') then raise exception 'invalid decision'; end if;
-  if p_decision = 'rejected' and nullif(btrim(p_reason), '') is null then
-    raise exception 'rejection reason required';
-  end if;
   select * into current_proof from public.payment_proofs where id = p_proof_id for update;
   if not found then raise exception 'proof not found'; end if;
   if current_proof.status <> 'pending' then raise exception 'proof already reviewed'; end if;
@@ -551,7 +549,7 @@ begin
       reviewed_at = now(), reviewed_by = auth.uid()
   where id = p_proof_id;
   next_status := current_order.order_status;
-  if p_decision = 'approved' and current_order.order_status in ('pending', 'confirmed') then
+  if p_decision = 'approved' and current_order.order_status = 'pending' then
     next_status := 'in_production';
   end if;
   update public.orders
@@ -626,6 +624,8 @@ drop policy if exists proofs_admin_read on public.payment_proofs;
 create policy proofs_admin_read on public.payment_proofs for select using (public.is_admin());
 drop policy if exists proofs_admin_update on public.payment_proofs;
 create policy proofs_admin_update on public.payment_proofs for update using (public.is_admin()) with check (public.is_admin());
+drop policy if exists proofs_admin_delete on public.payment_proofs;
+create policy proofs_admin_delete on public.payment_proofs for delete using (public.is_admin());
 drop policy if exists history_admin_all on public.order_status_history;
 drop policy if exists history_admin_read on public.order_status_history;
 create policy history_admin_read on public.order_status_history for select using (public.is_admin());
@@ -684,7 +684,7 @@ grant select, insert, update, delete on table
 to authenticated;
 grant select, update on table public.orders to authenticated;
 grant select on table public.order_items, public.admin_profiles to authenticated;
-grant select, update on table public.payment_proofs to authenticated;
+grant select, update, delete on table public.payment_proofs to authenticated;
 grant select, insert on table public.order_status_history to authenticated;
 grant all privileges on all tables in schema public to service_role;
 grant execute on function public.is_admin() to anon, authenticated, service_role;

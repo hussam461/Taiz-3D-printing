@@ -4,7 +4,6 @@ import {
   amountInPaymentCurrency,
   calculateOrderTotals,
 } from "@/lib/pricing";
-import { createOrderReference } from "@/lib/orders/reference";
 import { ALLOWED_PROOF_TYPES, MAX_PROOF_BYTES } from "@/types/domain";
 
 export type CreateOrderResult =
@@ -138,7 +137,7 @@ export async function createOrderFromCheckout(
   const payableDeposit = amountInPaymentCurrency(totals.depositOldYer, input.paymentCurrency, rate);
   const payableRemaining = amountInPaymentCurrency(totals.remainingOldYer, input.paymentCurrency, rate);
 
-  const reference = createOrderReference();
+  let reference = "";
   const orderId = crypto.randomUUID();
   const proofId = crypto.randomUUID();
   const { data: proofFile, error: stagedProofError } = await supabase.storage.from("payment-proofs").download(stagedProofPath);
@@ -154,9 +153,8 @@ export async function createOrderFromCheckout(
     .slice(0, 180) || `payment-proof.${ext}`;
   const storagePath = `${orderId}/${proofId}.${ext}`;
 
-  const { error: orderError } = await supabase.from("orders").insert({
+  const orderPayload = {
     id: orderId,
-    reference,
     idempotency_key: input.idempotencyKey,
     customer_name: input.customerName,
     customer_phone: input.customerPhone,
@@ -204,31 +202,38 @@ export async function createOrderFromCheckout(
     balance_status: totals.remainingOldYer > 0 ? "due" : "not_due",
     order_status: "pending",
     payment_status: "proof_pending",
-  });
+  };
 
-  if (orderError) {
-    if (orderError.code === "23505") {
-      const { data: again } = await supabase
-        .from("orders")
-        .select("reference, final_total_old_yer, deposit_old_yer, remaining_old_yer, payable_deposit, payable_remaining, payment_currency")
-        .eq("idempotency_key", input.idempotencyKey)
-        .maybeSingle();
-      if (again) {
-        return {
-          ok: true,
-          reference: again.reference,
-          finalTotalOldYer: Number(again.final_total_old_yer),
-          depositOldYer: Number(again.deposit_old_yer),
-          remainingOldYer: Number(again.remaining_old_yer),
-          paymentStatus: "proof_pending",
-          payableDeposit: Number(again.payable_deposit),
-          payableRemaining: Number(again.payable_remaining),
-          paymentCurrency: again.payment_currency,
-        };
-      }
+  let orderError: { code: string } | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: createdOrder, error } = await supabase.from("orders").insert(orderPayload).select("reference").single();
+    if (!error) {
+      reference = createdOrder.reference;
+      orderError = null;
+      break;
     }
-    return { ok: false, error: "تعذر إنشاء الطلب. حاول مرة أخرى" };
+    orderError = error;
+    if (error.code !== "23505") break;
+    const { data: again } = await supabase
+      .from("orders")
+      .select("reference, final_total_old_yer, deposit_old_yer, remaining_old_yer, payable_deposit, payable_remaining, payment_currency")
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+    if (again) {
+      return {
+        ok: true,
+        reference: again.reference,
+        finalTotalOldYer: Number(again.final_total_old_yer),
+        depositOldYer: Number(again.deposit_old_yer),
+        remainingOldYer: Number(again.remaining_old_yer),
+        paymentStatus: "proof_pending",
+        payableDeposit: Number(again.payable_deposit),
+        payableRemaining: Number(again.payable_remaining),
+        paymentCurrency: again.payment_currency,
+      };
+    }
   }
+  if (orderError) return { ok: false, error: "تعذر إنشاء الطلب. حاول مرة أخرى" };
 
   const itemsPayload = input.items.map((item, index) => {
     const product = productById.get(item.productId)!;
