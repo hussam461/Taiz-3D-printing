@@ -121,7 +121,7 @@ export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl
               لا يمكن حذفه لارتباطه بـ <strong>{category.product_count.toLocaleString("ar-YE-u-nu-latn")} منتج</strong>. أخفِ التصنيف بدلًا من ذلك.
             </div> : null}
           </div> : <ActionForm action={deleteSimpleRow.bind(null, "categories", category.id)} successMessage="تم حذف التصنيف." className="mt-2 border-t border-border pt-2">
-            <ConfirmSubmit compact message="هل تريد حذف هذا التصنيف؟ لا يمكن التراجع عن العملية." className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</ConfirmSubmit>
+            <ConfirmSubmit compact spinnerOnly pendingLabel="جارٍ حذف التصنيف" message="هل تريد حذف هذا التصنيف؟ لا يمكن التراجع عن العملية." className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</ConfirmSubmit>
           </ActionForm>}
         </article>)}
       </div> : <div className="rounded-2xl border border-dashed border-border bg-white px-5 py-12 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-muted"><CategoryIcon /></span><p className="mt-3 font-semibold">لا توجد تصنيفات بعد</p><p className="mt-1 text-sm text-muted">أضف أول تصنيف ليبدأ تنظيم منتجات المتجر.</p></div>}

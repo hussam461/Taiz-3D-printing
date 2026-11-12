@@ -175,6 +175,7 @@ export function CheckoutForm({
             payableDeposit: String(result.payableDeposit),
             payableRemaining: String(result.payableRemaining),
           });
+          try { sessionStorage.setItem("taiz-printer-order-success", "1"); } catch { /* Browser storage may be unavailable. */ }
           router.push(`/checkout/success?${params.toString()}`);
         });
       }}

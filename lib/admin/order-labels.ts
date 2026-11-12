@@ -1,9 +1,6 @@
 export const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: "بانتظار التأكيد",
-  confirmed: "تم التأكيد",
+  pending: "بانتظار إثبات الدفع",
   in_production: "قيد التجهيز",
-  ready: "جاهز للتسليم",
-  shipped: "قيد التسليم (طلب سابق)",
   completed: "مكتمل",
   cancelled: "ملغي",
 };
@@ -17,8 +14,8 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
 
 export const PAYMENT_PROOF_STATUS_LABELS: Record<string, string> = {
   pending: "بانتظار المراجعة",
-  approved: "تم اعتماد الإثبات",
-  rejected: "تم رفض الإثبات",
+  approved: "معتمد",
+  rejected: "مرفوض",
 };
 
 export const BALANCE_STATUS_LABELS: Record<string, string> = {
@@ -31,10 +28,7 @@ export const BALANCE_STATUS_LABELS: Record<string, string> = {
 
 export const ORDER_STATUS_KINDS: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
   pending: "warning",
-  confirmed: "info",
   in_production: "info",
-  ready: "info",
-  shipped: "success",
   completed: "success",
   cancelled: "danger",
 };
@@ -47,8 +41,5 @@ export const PAYMENT_STATUS_KINDS: Record<string, "success" | "warning" | "dange
 };
 
 export const ORDER_STATUS_OPTIONS: Record<string, string> = {
-  confirmed: "تأكيد الطلب",
-  in_production: "بدء التجهيز",
-  ready: "تجهيز الطلب للتسليم",
   cancelled: "إلغاء الطلب",
 };

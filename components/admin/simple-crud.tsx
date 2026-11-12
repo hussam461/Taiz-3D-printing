@@ -128,7 +128,7 @@ export function SimpleCrud({ table, rows, fields, polished = false }: { table: s
                 <SubmitButton disabled={polished && !dirtyRows[id]} className={`min-h-10 rounded-xl px-4 text-xs font-semibold transition ${polished ? `w-full border border-teal-700 text-teal-700 hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 ${table === "payment_accounts" ? "sm:col-span-2" : "2xl:col-span-2"}` : "border border-border bg-white py-3 text-sm hover:border-primary hover:bg-blue-50 md:col-span-2"}`} pendingLabel="جارٍ الحفظ...">حفظ التعديلات</SubmitButton>
               </ActionForm>
               <ActionForm action={removeAction} successMessage="تم حذف العنصر." className={`mt-1 flex ${polished ? "justify-start" : "border-t border-border pt-4"}`}>
-                <ConfirmSubmit compact={polished} confirmPrompt="تأكيد الحذف؟" confirmLabel="حذف" message="هل تريد حذف هذا العنصر؟ لا يمكن التراجع عن هذه العملية." className="min-h-8 rounded-lg px-2 py-1 text-xs font-semibold text-error transition hover:bg-red-50">{polished ? "حذف" : "حذف هذا العنصر"}</ConfirmSubmit>
+                <ConfirmSubmit compact={polished} spinnerOnly pendingLabel="جارٍ حذف العنصر" confirmPrompt="تأكيد الحذف؟" confirmLabel="حذف" message="هل تريد حذف هذا العنصر؟ لا يمكن التراجع عن هذه العملية." className="min-h-8 rounded-lg px-2 py-1 text-xs font-semibold text-error transition hover:bg-red-50">{polished ? "حذف" : "حذف هذا العنصر"}</ConfirmSubmit>
               </ActionForm>
             </div>
           );

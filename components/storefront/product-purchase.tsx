@@ -85,10 +85,10 @@ export function ProductPurchase({
             <QuantityStepper quantity={quantity} onChange={setQuantity} className="w-36" />
           </div>
         </fieldset>
-        {colors.length > 0 ? <fieldset className="space-y-2 rounded-xl border border-border bg-white p-3">
+        {colors.length > 0 ? <fieldset className="min-w-0 max-w-full space-y-2 rounded-xl border border-border bg-white p-3">
           <legend className="text-sm font-semibold text-text">اللون</legend>
-          <div className="storefront-color-options max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2 touch-pan-x">
-            <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-2 sm:gap-3">
+          <div className="storefront-color-options w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2 touch-pan-x">
+            <div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-2 whitespace-nowrap sm:gap-3">
             {orderedColors.map((color) => {
               const selected = colorId === color.id;
               const isCurrentProductColor = isCurrentProductColorOption(color.name);

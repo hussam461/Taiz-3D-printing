@@ -1,9 +1,6 @@
 export const ORDER_TRANSITIONS: Record<string, string[]> = {
-  pending: ["cancelled"],
-  confirmed: ["in_production", "cancelled"],
-  in_production: ["ready", "cancelled"],
-  ready: ["cancelled"],
-  shipped: [],
+  pending: [],
+  in_production: ["cancelled"],
   completed: [],
   cancelled: [],
 };

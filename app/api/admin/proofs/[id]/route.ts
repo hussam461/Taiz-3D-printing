@@ -16,11 +16,15 @@ export async function GET(
     .maybeSingle();
   if (!proof) return new Response("Not found", { status: 404 });
   const { data, error } = await supabase.storage.from("payment-proofs").download(proof.storage_path);
-  if (error || !data) return new Response("Not found", { status: 404 });
+  if (error || !data) {
+    console.error("Admin payment proof download failed", { proofId: id, error });
+    return new Response("Not found", { status: 404 });
+  }
+  const filename = String(proof.original_filename ?? "proof").replace(/[\r\n"\\]/g, "_");
   return new Response(data, {
     headers: {
       "Content-Type": proof.mime_type,
-      "Content-Disposition": `inline; filename="${proof.original_filename ?? "proof"}"`,
+      "Content-Disposition": `inline; filename="proof"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": "private, no-store",
     },
   });

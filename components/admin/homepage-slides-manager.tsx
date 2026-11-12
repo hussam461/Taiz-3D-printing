@@ -84,7 +84,7 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
     </> : null}
     {editing ? <button type="button" onClick={() => { clearPreview(); setEditing(false); }} className="rounded-lg px-3 py-2 text-sm font-semibold text-muted transition hover:bg-slate-100">إلغاء</button> : <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-9 items-center rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary transition hover:bg-blue-50">تعديل</button>}
     <ActionForm action={async () => deleteHomepageSlide(slide.id)} successMessage="تم حذف الشريحة." feedbackPlacement="toast">
-      <ConfirmSubmit message="سيتم حذف الشريحة وصورتها من المعرض." className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" compact>حذف</ConfirmSubmit>
+      <ConfirmSubmit message="سيتم حذف الشريحة وصورتها من المعرض." className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" compact spinnerOnly pendingLabel="جارٍ حذف الشريحة">حذف</ConfirmSubmit>
     </ActionForm>
   </div> : onClose ? <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-sm font-semibold text-muted transition hover:bg-slate-100 hover:text-text">إلغاء</button> : null;
 

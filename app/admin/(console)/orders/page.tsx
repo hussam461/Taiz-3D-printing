@@ -2,30 +2,31 @@ import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { PageHeader, StatusBadge, EmptyState } from "@/components/admin/ui";
 import { OrderGroupTab } from "@/components/admin/order-group-tab";
-import { BALANCE_STATUS_LABELS, ORDER_STATUS_KINDS, ORDER_STATUS_LABELS, PAYMENT_STATUS_KINDS, PAYMENT_STATUS_LABELS } from "@/lib/admin/order-labels";
-import { formatOldYer } from "@/lib/formatting/money";
+import { OrderStatusFilter } from "@/components/admin/order-status-filter";
+import { OrderDeleteButton } from "@/components/admin/order-delete-button";
+import { ORDER_STATUS_KINDS, ORDER_STATUS_LABELS } from "@/lib/admin/order-labels";
+import { formatMoney } from "@/lib/formatting/money";
 
 const PAGE_SIZE = 25;
-const ACTIVE_STATUSES = ["pending", "confirmed", "in_production", "ready", "shipped"];
-type Search = { q?: string; status?: string; payment?: string; balance?: string; page?: string; group?: string };
+const ACTIVE_STATUSES = ["pending", "in_production"];
+type Search = { q?: string; status?: string; page?: string; group?: string };
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
   const q = safeSearch(params.q ?? "");
-  const status = Object.hasOwn(ORDER_STATUS_LABELS, params.status ?? "") ? params.status! : "";
-  const group = status ? ACTIVE_STATUSES.includes(status) ? "active" : "archive" : ["active", "archive", "all"].includes(params.group ?? "") ? params.group! : "active";
-  const payment = Object.hasOwn(PAYMENT_STATUS_LABELS, params.payment ?? "") ? params.payment! : "";
-  const balance = ["due", "paid", "not_due", "legacy_untracked"].includes(params.balance ?? "") ? params.balance! : "";
+  const status = ACTIVE_STATUSES.includes(params.status ?? "") ? params.status! : "";
+  const group = ["active", "completed", "cancelled"].includes(params.group ?? "") ? params.group! : "active";
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const supabase = await createServerSupabase();
-  let query = supabase.from("orders").select("id, reference, customer_name, customer_phone, order_status, payment_status, balance_status, final_total_old_yer, created_at").order("created_at", { ascending: false });
-  if (q) query = query.or(`reference.ilike.%${q}%,customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`);
-  if (status) query = query.eq("order_status", status);
-  else if (group === "active") query = query.in("order_status", ACTIVE_STATUSES);
-  else if (group === "archive") query = query.in("order_status", ["completed", "cancelled"]);
-  if (payment) query = query.eq("payment_status", payment);
-  if (balance) query = query.eq("balance_status", balance);
-  if (balance === "due") query = query.neq("order_status", "cancelled");
+  // A rejected payment proof is handled from the payment-proofs page, not as an order to fulfill.
+  // Apply this to every group and filter so rejected orders never reappear through search/archive.
+  let query = supabase.from("orders").select("id, reference, customer_name, customer_phone, order_status, payable_deposit, payable_remaining, payment_currency, created_at").neq("payment_status", "proof_rejected").order("created_at", { ascending: false });
+  if (q) query = query.or(`reference.ilike.%${q}%,legacy_reference.ilike.%${q}%,customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`);
+  if (status) {
+    query = query.eq("order_status", status);
+  }
+  else if (group === "completed" || group === "cancelled") query = query.eq("order_status", group);
+  else query = query.in("order_status", ACTIVE_STATUSES);
   const from = (page - 1) * PAGE_SIZE;
   const { data, error } = await query.range(from, from + PAGE_SIZE);
   const hasMore = (data?.length ?? 0) > PAGE_SIZE;
@@ -33,55 +34,43 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader eyebrow="التشغيل" title="الطلبات" description="ابدأ بما يحتاج متابعة، وابحث برقم الطلب أو اسم العميل أو هاتفه." />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard label="مراجعة العربون" hint="راجع الإثبات واتخذ القرار" href="/admin/payment-proofs?status=pending" />
-        <SummaryCard label="قيد التجهيز" hint="طلبات بدأ تجهيزها بعد اعتماد العربون" href="/admin/orders?status=in_production&group=active" />
-        <SummaryCard label="جاهزة للتسليم" hint="سجّل التسليم والمتبقي عند الاستلام" href="/admin/orders?status=ready&group=active" />
-      </div>
+      <PageHeader eyebrow="التشغيل" title="الطلبات" />
       <nav aria-label="مجموعات الطلبات" className="flex gap-2 overflow-x-auto border-b border-border pb-2">
-        <OrderGroupTab current={group} value="active" label="الطلبات النشطة" params={{ q, payment, balance }} />
-        <OrderGroupTab current={group} value="archive" label="الأرشيف: مكتملة وملغاة" params={{ q, payment, balance }} />
-        <OrderGroupTab current={group} value="all" label="كل الطلبات" params={{ q, payment, balance }} />
+        <OrderGroupTab current={group} value="active" label="الطلبات النشطة" params={{ q }} />
+        <OrderGroupTab current={group} value="completed" label="مكتملة" params={{ q }} />
+        <OrderGroupTab current={group} value="cancelled" label="ملغاة" params={{ q }} />
       </nav>
-      <form action="/admin/orders" className="space-y-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">
+      <form action="/admin/orders" className="space-y-3 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
         <input type="hidden" name="group" value={group} />
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <label className="flex-1 space-y-1 text-sm"><span className="font-medium">ابحث عن طلب</span><input name="q" defaultValue={q} placeholder="رقم الطلب، اسم العميل، أو الهاتف" className="min-h-11 w-full rounded-lg border border-border bg-white px-3" /></label>
-          <button className="min-h-11 self-end rounded-lg bg-primary px-5 font-semibold text-white hover:bg-primary-hover">بحث</button>
-          <Link href="/admin/orders" className="inline-flex min-h-11 items-center justify-center self-end rounded-lg border border-border px-4 font-medium hover:bg-slate-50">مسح</Link>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_15rem]">
+          <label className="col-start-1 min-w-0">
+            <span className="sr-only">ابحث عن طلب</span>
+            <input name="q" defaultValue={q} placeholder="رقم الطلب، اسم العميل، أو الهاتف" className="min-h-10 w-full rounded-lg border border-border bg-white px-3 text-sm" />
+          </label>
+          <button className="col-start-2 row-start-1 min-h-10 shrink-0 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover">بحث</button>
+          <label className="col-span-2 col-start-1 row-start-2 min-w-0 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+            <span className="mb-1 block text-xs font-medium">حالة الطلب</span>
+            <OrderStatusFilter value={status} />
+          </label>
         </div>
-        <details open={Boolean(status || payment || balance)} className="rounded-xl border border-border bg-slate-50/70 p-3">
-          <summary className="cursor-pointer text-sm font-semibold">تصفية متقدمة</summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <label className="space-y-1 text-sm"><span className="font-medium">حالة الطلب</span><select name="status" defaultValue={status} className="min-h-11 w-full rounded-lg border border-border bg-white px-3"><option value="">كل الحالات</option>{Object.entries(ORDER_STATUS_LABELS).filter(([key]) => key !== "shipped").map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-            <label className="space-y-1 text-sm"><span className="font-medium">حالة العربون</span><select name="payment" defaultValue={payment} className="min-h-11 w-full rounded-lg border border-border bg-white px-3"><option value="">كل حالات الدفع</option>{Object.entries(PAYMENT_STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-            <label className="space-y-1 text-sm"><span className="font-medium">المبلغ المتبقي</span><select name="balance" defaultValue={balance} className="min-h-11 w-full rounded-lg border border-border bg-white px-3"><option value="">كل الحالات</option>{Object.entries(BALANCE_STATUS_LABELS).filter(([key]) => key !== "cancelled_due").map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-            <button className="min-h-11 self-end rounded-lg border border-border bg-white px-5 font-semibold hover:bg-slate-100">تطبيق التصفية</button>
-          </div>
-        </details>
       </form>
       {error ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">تعذر تحميل الطلبات. حدّث الصفحة، وإذا استمرت المشكلة تواصل مع مسؤول النظام.</div> : null}
-      {!error && orders.length === 0 ? <EmptyState title={q || status || payment || balance ? "لا توجد طلبات مطابقة" : group === "archive" ? "الأرشيف فارغ" : group === "active" ? "لا توجد طلبات تحتاج إلى متابعة" : "لا توجد طلبات حتى الآن"} description={q || status || payment || balance ? "غيّر البحث أو عوامل التصفية لعرض طلبات أخرى." : group === "active" ? "الطلبات المكتملة والملغاة محفوظة في الأرشيف." : "ستظهر الطلبات هنا بعد إتمام العملاء للشراء من المتجر."} /> : null}
+      {!error && orders.length === 0 ? <EmptyState title={q || status ? "لا توجد طلبات مطابقة" : group === "completed" ? "لا توجد طلبات مكتملة" : group === "cancelled" ? "لا توجد طلبات ملغاة" : "لا توجد طلبات نشطة"} description={q || status ? "غيّر البحث أو حالة الطلب لعرض طلبات أخرى." : group === "active" ? "الطلبات المكتملة والملغاة تظهر في تبويبيها." : "ستظهر الطلبات هنا عند توفرها."} /> : null}
       {orders.length > 0 ? <>
         <p className="text-sm text-muted">عرض {from + 1}–{from + orders.length} طلب</p>
-        <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm md:block"><table className="w-full min-w-[900px] text-right text-sm">
-          <thead className="bg-slate-50 text-xs text-muted"><tr><th className="p-4 font-medium">الطلب</th><th className="p-4 font-medium">العميل</th><th className="p-4 font-medium">حالة الطلب</th><th className="p-4 font-medium">حالة العربون</th><th className="p-4 font-medium">المتبقي</th><th className="p-4 font-medium">الإجمالي</th><th className="p-4 font-medium">تاريخ الإنشاء</th><th className="p-4"><span className="sr-only">الإجراء</span></th></tr></thead>
-          <tbody>{orders.map((order) => <tr key={order.id} className="border-t border-border transition hover:bg-slate-50/70"><td className="p-4"><Link className="font-semibold text-primary hover:underline" href={`/admin/orders/${order.id}`}>{order.reference}</Link></td><td className="p-4"><p>{order.customer_name}</p><p dir="ltr" className="mt-1 text-xs text-muted">{order.customer_phone}</p></td><td className="p-4"><StatusBadge value={ORDER_STATUS_LABELS[order.order_status] ?? "حالة غير معروفة"} kind={ORDER_STATUS_KINDS[order.order_status] ?? "neutral"} /></td><td className="p-4"><StatusBadge value={PAYMENT_STATUS_LABELS[order.payment_status] ?? "حالة دفع غير معروفة"} kind={PAYMENT_STATUS_KINDS[order.payment_status] ?? "neutral"} /></td><td className="p-4"><StatusBadge value={balanceLabel(order)} kind={balanceKind(order)} /></td><td className="whitespace-nowrap p-4 font-medium">{formatOldYer(Number(order.final_total_old_yer))}</td><td className="whitespace-nowrap p-4 text-xs text-muted">{new Date(order.created_at).toLocaleDateString("ar-YE-u-nu-latn")}</td><td className="p-4"><Link className="font-semibold text-primary hover:underline" href={`/admin/orders/${order.id}`}>فتح الطلب</Link></td></tr>)}</tbody>
+        <div role="region" aria-label="جدول الطلبات" tabIndex={0} className="max-w-full overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm focus-visible:outline-2 focus-visible:outline-primary"><table className="w-full min-w-[760px] text-right text-sm">
+          <thead className="bg-slate-50 text-xs text-muted"><tr><th className="p-4 font-medium">رقم الطلب</th><th className="p-4 font-medium">العميل</th><th className="p-4 font-medium">حالة الطلب</th><th className="p-4 font-medium">العربون</th><th className="p-4 font-medium">المتبقي</th><th className="p-4 font-medium">تاريخ الإنشاء</th><th className="p-4"><span className="sr-only">الإجراء</span></th></tr></thead>
+          <tbody>{orders.map((order) => <tr key={order.id} className="border-t border-border odd:bg-white even:bg-slate-50/70 transition-colors hover:bg-teal-50/70"><td className="whitespace-nowrap p-3 sm:p-4"><Link className="font-semibold text-primary hover:underline" href={`/admin/orders/${order.id}`}>{order.reference}</Link></td><td className="p-3 sm:p-4"><p className="whitespace-nowrap">{order.customer_name}</p><p dir="ltr" className="mt-1 whitespace-nowrap text-xs text-muted">{order.customer_phone}</p></td><td className="whitespace-nowrap p-3 sm:p-4"><StatusBadge value={ORDER_STATUS_LABELS[order.order_status] ?? "حالة غير معروفة"} kind={ORDER_STATUS_KINDS[order.order_status] ?? "neutral"} /></td><td className="whitespace-nowrap p-3 font-medium sm:p-4">{formatMoney(Number(order.payable_deposit), order.payment_currency)}</td><td className="whitespace-nowrap p-3 font-medium sm:p-4">{formatMoney(Number(order.payable_remaining), order.payment_currency)}</td><td className="whitespace-nowrap p-3 text-xs text-muted sm:p-4">{new Date(order.created_at).toLocaleDateString("ar-YE-u-nu-latn")}</td><td className="whitespace-nowrap p-3 sm:p-4"><div className="flex items-center gap-3"><Link className="font-semibold text-primary hover:underline" href={`/admin/orders/${order.id}`}>فتح الطلب</Link>{order.order_status === "completed" || order.order_status === "cancelled" ? <OrderDeleteButton orderId={order.id} orderReference={order.reference} /> : null}</div></td></tr>)}</tbody>
         </table></div>
-        <ul className="space-y-3 md:hidden">{orders.map((order) => <li key={order.id} className="rounded-2xl border border-border bg-surface p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted">رقم الطلب</p><Link className="mt-1 inline-block font-bold text-primary" href={`/admin/orders/${order.id}`}>{order.reference}</Link></div><span className="text-xs text-muted">{new Date(order.created_at).toLocaleDateString("ar-YE-u-nu-latn")}</span></div><p className="mt-3 font-medium">{order.customer_name}</p><p dir="ltr" className="mt-1 text-start text-xs text-muted">{order.customer_phone}</p><div className="mt-3 flex flex-wrap gap-2"><StatusBadge value={ORDER_STATUS_LABELS[order.order_status] ?? "حالة غير معروفة"} kind={ORDER_STATUS_KINDS[order.order_status] ?? "neutral"} /><StatusBadge value={PAYMENT_STATUS_LABELS[order.payment_status] ?? "حالة دفع غير معروفة"} kind={PAYMENT_STATUS_KINDS[order.payment_status] ?? "neutral"} /><StatusBadge value={balanceLabel(order)} kind={balanceKind(order)} /></div><div className="mt-4 flex items-center justify-between border-t border-border pt-3"><span className="font-semibold">{formatOldYer(Number(order.final_total_old_yer))}</span><Link className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white" href={`/admin/orders/${order.id}`}>فتح الطلب</Link></div></li>)}</ul>
-        <Pagination page={page} hasMore={hasMore} params={{ q, status, payment, balance, group }} />
+        <Pagination page={page} hasMore={hasMore} params={{ q, status, group }} />
       </> : null}
     </div>
   );
 }
 
-function SummaryCard({ label, hint, href }: { label: string; hint: string; href: string }) { return <Link href={href} className="rounded-xl border border-border bg-surface p-4 transition hover:border-primary/40 hover:shadow-sm"><p className="font-semibold">{label}</p><p className="mt-1 text-sm text-muted">{hint}</p></Link>; }
 function Pagination({ page, hasMore, params }: { page: number; hasMore: boolean; params: Record<string, string> }) {
   if (page <= 1 && !hasMore) return null;
   const href = (target: number) => `/admin/orders?${new URLSearchParams({ ...Object.fromEntries(Object.entries(params).filter(([, value]) => value)), page: String(target) })}`;
   return <nav aria-label="صفحات الطلبات" className="flex items-center justify-between border-t border-border pt-4 text-sm"><span className="text-muted">صفحة {page.toLocaleString("ar-YE-u-nu-latn")}</span><div className="flex gap-2"><Link aria-disabled={page <= 1} className={`rounded-lg border border-border px-3 py-2 ${page <= 1 ? "pointer-events-none opacity-50" : "hover:bg-slate-50"}`} href={href(Math.max(1, page - 1))}>السابقة</Link><Link aria-disabled={!hasMore} className={`rounded-lg border border-border px-3 py-2 ${!hasMore ? "pointer-events-none opacity-50" : "hover:bg-slate-50"}`} href={href(page + 1)}>التالية</Link></div></nav>;
 }
 function safeSearch(value: string) { return value.replace(/[^\p{L}\p{N}\s-]/gu, "").trim().slice(0, 80); }
-function balanceLabel(order: { balance_status: string; order_status: string }) { if (order.balance_status === "due" && order.order_status === "cancelled") return BALANCE_STATUS_LABELS.cancelled_due; return BALANCE_STATUS_LABELS[order.balance_status] ?? "حالة غير معروفة"; }
-function balanceKind(order: { balance_status: string; order_status: string }): "success" | "warning" | "neutral" { if (order.balance_status === "paid") return "success"; if (order.balance_status === "due" && order.order_status !== "cancelled") return "warning"; return "neutral"; }

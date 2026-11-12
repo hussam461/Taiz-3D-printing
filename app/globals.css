@@ -103,6 +103,21 @@ body {
   transform: scale(0.998);
 }
 
+.admin-console-shell :is(a[href], button:not(:disabled), [role="button"]) {
+  transition: transform 140ms ease-out, opacity 140ms ease-out;
+}
+
+.admin-console-shell :is(a[href], button:not(:disabled), [role="button"]):active {
+  transform: scale(0.98);
+  opacity: 0.82;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-console-shell :is(a[href], button:not(:disabled), [role="button"]):active {
+    transform: none;
+  }
+}
+
 summary {
   list-style: none;
 }
@@ -116,6 +131,13 @@ summary {
 }
 
 .storefront-color-options {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgb(100 116 139 / 55%) transparent;
 }

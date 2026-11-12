@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { canTransition } from "@/lib/orders/transitions";
 import { PAYMENT_CURRENCIES } from "@/types/domain";
 import { hasValidProductImageSignature, parseProductForm, productImageExtension, validateProductImageMetadata } from "@/lib/validation/product";
 import { parseDeliveryFee } from "@/lib/validation/delivery-fee";
+import { whatsappNumber } from "@/lib/formatting/whatsapp";
 
 async function isImageReferencedByHistoricalOrder(
   supabase: SupabaseClient,
@@ -77,7 +79,7 @@ export async function updateOrderStatus(orderId: string, toStatus: string, note?
   const supabase = await createServerSupabase();
   const { data: order } = await supabase.from("orders").select("*").eq("id", orderId).single();
   if (!order) return { ok: false as const, error: "الطلب غير موجود" };
-  if (toStatus === "shipped" || toStatus === "completed") {
+  if (toStatus === "completed") {
     return { ok: false as const, error: "استخدم إجراء تأكيد التسليم لتسجيل التسليم والتحصيل بأمان." };
   }
   if (!canTransition(order.order_status, toStatus)) {
@@ -107,6 +109,58 @@ export async function updateOrderStatus(orderId: string, toStatus: string, note?
   return { ok: true as const };
 }
 
+export async function deleteTerminalOrder(orderId: string) {
+  await requireAdmin();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+    return { ok: false as const, error: "رقم الطلب غير صالح." };
+  }
+
+  const supabase = createServiceClient();
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, order_status")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (orderError || !order) return { ok: false as const, error: "تعذر العثور على الطلب. حدّث الصفحة وحاول مجددًا." };
+  if (order.order_status !== "completed" && order.order_status !== "cancelled") {
+    return { ok: false as const, error: "يمكن حذف الطلبات المكتملة أو الملغاة فقط." };
+  }
+
+  const { data: proofs, error: proofsError } = await supabase
+    .from("payment_proofs")
+    .select("storage_path")
+    .eq("order_id", orderId);
+  if (proofsError) {
+    console.error("Order payment proofs could not be loaded before deletion", { orderId, error: proofsError });
+    return { ok: false as const, error: "تعذر التحقق من ملفات إثبات الدفع؛ لم يُحذف الطلب." };
+  }
+
+  const paths = [...new Set((proofs ?? []).map((proof) => proof.storage_path).filter(Boolean))];
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage.from("payment-proofs").remove(paths);
+    if (storageError) {
+      console.error("Order payment proof files could not be removed", { orderId, error: storageError });
+      return { ok: false as const, error: "تعذر حذف ملفات إثبات الدفع؛ لم يُحذف سجل الطلب." };
+    }
+  }
+
+  const { data: deletedOrder, error: deleteError } = await supabase
+    .from("orders")
+    .delete()
+    .eq("id", orderId)
+    .in("order_status", ["completed", "cancelled"])
+    .select("id")
+    .maybeSingle();
+  if (deleteError || !deletedOrder) {
+    console.error("Order deletion failed after proof file cleanup", { orderId, error: deleteError });
+    return { ok: false as const, error: "تعذر حذف سجل الطلب بعد تنظيف ملفات الإثبات. حدّث الصفحة وحاول مجددًا." };
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
 export async function completeOrderDelivery(orderId: string) {
   await requireAdmin();
   const supabase = await createServerSupabase();
@@ -116,8 +170,7 @@ export async function completeOrderDelivery(orderId: string) {
     if (error.code === "PGRST202" || error.code === "PGRST204") {
       return { ok: false as const, error: "تأكيد التسليم والتحصيل غير مفعّل في قاعدة البيانات بعد. شغّل تحديث قاعدة البيانات المطلوب ثم حاول مجددًا." };
     }
-    if (error.message.includes("order is not ready for delivery")) return { ok: false as const, error: "لا يمكن تسجيل التسليم قبل أن يصبح الطلب جاهزًا للتسليم." };
-    if (error.message.includes("order is not out for delivery")) return { ok: false as const, error: "حدّث قاعدة البيانات أولًا لتفعيل تسجيل التسليم من حالة جاهز للتسليم." };
+    if (error.message.includes("order is not in production")) return { ok: false as const, error: "لا يمكن إكمال الطلب قبل اعتماد إثبات العربون وبدء التجهيز." };
     if (error.message.includes("deposit proof is not approved")) return { ok: false as const, error: "اعتمد إثبات العربون أولًا قبل تسجيل تحصيل المتبقي." };
     if (error.message.includes("no tracked balance")) return { ok: false as const, error: "لا يوجد مبلغ متبقٍ مستحق للتسجيل في هذا الطلب." };
     if (error.message.includes("order not found")) return { ok: false as const, error: "الطلب غير موجود. حدّث الصفحة وتحقق منه." };
@@ -129,13 +182,10 @@ export async function completeOrderDelivery(orderId: string) {
   return { ok: true as const };
 }
 
-export async function reviewProof(proofId: string, decision: "approved" | "rejected", reason?: string) {
+export async function reviewProof(proofId: string, decision: "approved" | "rejected", reason?: string, sendWhatsApp = false, customerMessage?: string) {
   await requireAdmin();
-  if (decision === "rejected" && !reason?.trim()) {
-    return { ok: false as const, error: "سبب الرفض مطلوب" };
-  }
   const supabase = await createServerSupabase();
-  const { data: proof, error: proofLoadError } = await supabase.from("payment_proofs").select("order_id").eq("id", proofId).maybeSingle();
+  const { data: proof, error: proofLoadError } = await supabase.from("payment_proofs").select("order_id, orders(customer_name, customer_phone, reference)").eq("id", proofId).maybeSingle();
   if (proofLoadError || !proof) return { ok: false as const, error: "تعذر العثور على إثبات الدفع. حدّث الصفحة وحاول مرة أخرى." };
   const { error } = await supabase.rpc("admin_review_order_payment_proof", {
     p_proof_id: proofId,
@@ -146,15 +196,100 @@ export async function reviewProof(proofId: string, decision: "approved" | "rejec
     console.error("Payment proof review failed", { proofId, decision, error });
     if (error.message.includes("proof already reviewed")) return { ok: false as const, error: "تمت مراجعة هذا الإثبات بالفعل. حدّث الصفحة للاطلاع على الحالة الجديدة." };
     if (error.message.includes("order is closed")) return { ok: false as const, error: "لا يمكن اعتماد إثبات طلب مكتمل أو ملغي." };
-    if (error.message.includes("rejection reason required")) return { ok: false as const, error: "اكتب سبب رفض الإثبات ليعرف العميل ما الذي يحتاج إلى تصحيحه." };
     if (error.message.includes("not authorized")) return { ok: false as const, error: "انتهت صلاحية الجلسة أو لا تملك صلاحية مراجعة الإثبات. سجّل الدخول مجددًا." };
     if (error.code === "PGRST202" || error.code === "PGRST204") return { ok: false as const, error: "تحديث قاعدة البيانات المطلوب غير مفعّل بعد. شغّل migration تشغيل الطلبات وإثباتات الدفع ثم أعد المحاولة." };
     return { ok: false as const, error: "تعذر مراجعة الإثبات وتحديث الطلب. لم يُسجّل القرار؛ أعد المحاولة." };
   }
   revalidatePath("/admin");
   revalidatePath("/admin/orders");
-  revalidatePath("/admin/payment-proofs");
   revalidatePath(`/admin/orders/${proof.order_id}`);
+  if (sendWhatsApp) {
+    const order = Array.isArray(proof.orders) ? proof.orders[0] : proof.orders;
+    const phone = order?.customer_phone ? whatsappNumber(String(order.customer_phone)) : "";
+    if (phone) {
+      const reasonText = reason?.trim().slice(0, 1200) ?? "";
+      const customText = customerMessage?.trim().slice(0, 1200) ?? "";
+      const message = decision === "rejected"
+        ? `السلام عليكم ${order.customer_name}، بخصوص طلبك ${order.reference}: تعذر اعتماد إثبات الدفع.${reasonText ? ` سبب الرفض: ${reasonText}.` : ""} يرجى إعادة إرسال الإثبات حتى نتمكن من متابعة طلبك.`
+        : customText || `السلام عليكم ${order.customer_name}، تم اعتماد إثبات العربون لطلبك ${order.reference}، وبدأنا تجهيز الطلب. شكرًا لثقتك بنا.`;
+      redirect(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    }
+  }
+  return { ok: true as const };
+}
+
+export async function deletePaymentProof(proofId: string) {
+  await requireAdmin();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(proofId)) {
+    return { ok: false as const, error: "رقم الإثبات غير صالح." };
+  }
+
+  const supabase = await createServerSupabase();
+  const { data: proof, error: loadError } = await supabase.from("payment_proofs").select("id, order_id, storage_path, status").eq("id", proofId).maybeSingle();
+  if (loadError || !proof) return { ok: false as const, error: "تعذر العثور على الإثبات. حدّث الصفحة وحاول مجددًا." };
+  if (proof.status === "pending") return { ok: false as const, error: "لا يمكن حذف إثبات ما زال بانتظار المراجعة." };
+
+  const { error: storageError } = await supabase.storage.from("payment-proofs").remove([proof.storage_path]);
+  if (storageError) {
+    console.error("Payment proof file deletion failed", { proofId, error: storageError });
+    return { ok: false as const, error: "تعذر حذف ملف الإثبات من التخزين؛ لم يُحذف سجل الإثبات." };
+  }
+
+  const { data: deletedProof, error: deleteError } = await createServiceClient()
+    .from("payment_proofs")
+    .delete()
+    .eq("id", proofId)
+    .in("status", ["approved", "rejected"])
+    .select("id")
+    .maybeSingle();
+  if (deleteError || !deletedProof) {
+    console.error("Payment proof record deletion failed", { proofId, error: deleteError });
+    return { ok: false as const, error: "حُذف الملف لكن تعذر حذف سجل الإثبات. أعد المحاولة." };
+  }
+
+  return { ok: true as const };
+}
+
+export async function deletePaymentProofs(formData: FormData) {
+  await requireAdmin();
+  const proofIds = [...new Set(formData.getAll("proofIds").map((value) => String(value)))];
+  if (proofIds.length === 0 || proofIds.length > 500 || proofIds.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+    return { ok: false as const, error: "حدد إثباتات صالحة للحذف (حتى 500 إثبات في المرة الواحدة)." };
+  }
+
+  const supabase = await createServerSupabase();
+  const serviceSupabase = createServiceClient();
+  const { data: proofs, error: loadError } = await supabase
+    .from("payment_proofs")
+    .select("id, order_id, storage_path, status")
+    .in("id", proofIds)
+    .in("status", ["approved", "rejected"]);
+  if (loadError || !proofs || proofs.length !== proofIds.length) {
+    return { ok: false as const, error: "تعذر حذف بعض الإثباتات أو تغيرت حالتها. حدّث الصفحة وحاول مجددًا." };
+  }
+
+  const batchSize = 50;
+  for (let offset = 0; offset < proofs.length; offset += batchSize) {
+    const batch = proofs.slice(offset, offset + batchSize);
+    const batchIds = batch.map((proof) => proof.id);
+    const { error: storageError } = await supabase.storage.from("payment-proofs").remove(batch.map((proof) => proof.storage_path));
+    if (storageError) {
+      console.error("Bulk payment proof file deletion failed", { deletedCount: offset, error: storageError });
+      return { ok: false as const, error: offset ? `حُذف ${offset} إثباتًا، وتعذر حذف الدفعة التالية. حدّث الصفحة لمراجعة ما تبقى.` : "تعذر حذف ملفات الإثباتات من التخزين؛ لم تُحذف سجلاتها." };
+    }
+
+    const { data: deletedProofs, error: deleteError } = await serviceSupabase
+      .from("payment_proofs")
+      .delete()
+      .in("id", batchIds)
+      .in("status", ["approved", "rejected"])
+      .select("id");
+    if (deleteError || deletedProofs?.length !== batchIds.length) {
+      console.error("Bulk payment proof record deletion failed", { deletedCount: offset, batchSize: batch.length, error: deleteError });
+      return { ok: false as const, error: `تعذر حذف سجلات الدفعة بعد حذف ملفاتها. حدّث الصفحة وتحقق من الإثباتات المتبقية.` };
+    }
+  }
+
   return { ok: true as const };
 }
 
