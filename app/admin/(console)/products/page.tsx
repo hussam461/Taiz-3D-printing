@@ -3,7 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { deleteProduct, toggleProductPublication } from "@/lib/admin/actions";
 import { ProductFilters } from "@/components/admin/product-filters";
 import { ActionForm, SubmitButton } from "@/components/admin/action-form";
-import { ConfirmSubmit } from "@/components/admin/confirm-submit";
+import { ProductDeleteButton, ProductDeleteProvider } from "@/components/admin/product-delete-button";
 import { FeedbackNotice } from "@/components/admin/feedback-notice";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import Image from "next/image";
@@ -34,6 +34,7 @@ export default async function AdminProductsPage({
   const products = data ?? [];
 
   return (
+    <ProductDeleteProvider>
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex items-center justify-between gap-3 border-b border-border pb-4 sm:items-end sm:pb-6">
         <div>
@@ -70,7 +71,7 @@ export default async function AdminProductsPage({
               <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
                 <ActionForm action={async () => { "use server"; return toggleProductPublication(product.id, product.is_active); }} feedbackPlacement="toast" successMessage="تم تحديث حالة نشر المنتج."><SubmitButton spinnerOnly pendingLabel="جارٍ تحديث حالة النشر" ariaLabel={product.is_active ? "إيقاف نشر المنتج" : "نشر المنتج"} className={`inline-flex h-9 w-10 items-center justify-center rounded-lg px-2 text-xs font-semibold transition ${product.is_active ? "border border-border bg-white text-text hover:bg-slate-50" : "bg-primary text-white hover:bg-primary-hover"}`}>{product.is_active ? "إيقاف" : "نشر"}</SubmitButton></ActionForm>
                 <Link href={`/admin/products/${product.id}`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-border px-3 text-xs font-semibold text-primary">تعديل</Link>
-                <ActionForm action={async () => { "use server"; return deleteProduct(product.id); }} feedbackPlacement="toast" successMessage="تم حذف المنتج."><ConfirmSubmit compact spinnerOnly message="سيتم حذف المنتج نهائيًا من قائمة المنتجات. تبقى بيانات الطلبات السابقة محفوظة." confirmPrompt="حذف؟" pendingLabel="جارٍ حذف المنتج" className="min-h-9 rounded-lg px-2 text-xs font-semibold text-error hover:bg-red-50">حذف</ConfirmSubmit></ActionForm>
+                <ProductDeleteButton action={async () => { "use server"; return deleteProduct(product.id); }} />
               </div>
             </article>;
           })}
@@ -86,7 +87,7 @@ export default async function AdminProductsPage({
                   <td className="p-4 text-muted">{category ?? "بدون تصنيف"}</td>
                   <td className="whitespace-nowrap p-4"><span dir="auto" className="font-medium tabular-nums">{product.base_price_old_yer.toLocaleString("ar-YE-u-nu-latn")}</span>{product.discount_percent ? <span className="ms-2 text-xs text-success">-{product.discount_percent}%</span> : null}</td>
                   <td className="p-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${product.is_active ? "bg-green-50 text-success" : "bg-slate-100 text-muted"}`}>{product.is_active ? "منشور وفعال" : "مسودة / غير فعال"}</span>{product.is_featured ? <span className="ms-2 text-xs text-warning">مميز</span> : null}</td>
-                  <td className="w-[190px] whitespace-nowrap p-4"><div className="flex flex-nowrap items-center gap-3 whitespace-nowrap"><ActionForm action={async () => { "use server"; return toggleProductPublication(product.id, product.is_active); }} feedbackPlacement="toast" successMessage="تم تحديث حالة نشر المنتج."><SubmitButton spinnerOnly pendingLabel="جارٍ تحديث حالة النشر" ariaLabel={product.is_active ? "إيقاف نشر المنتج" : "نشر المنتج"} className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg px-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${product.is_active ? "border border-border bg-white text-text hover:bg-slate-50" : "bg-primary text-white hover:bg-primary-hover"}`}>{product.is_active ? "إيقاف" : "نشر"}</SubmitButton></ActionForm><Link href={`/admin/products/${product.id}`} className="text-xs font-medium text-primary hover:underline">تعديل</Link><ActionForm action={async () => { "use server"; return deleteProduct(product.id); }} feedbackPlacement="toast" successMessage="تم حذف المنتج."><ConfirmSubmit compact spinnerOnly message="سيتم حذف المنتج نهائيًا من قائمة المنتجات. تبقى بيانات الطلبات السابقة محفوظة." confirmPrompt="حذف؟" pendingLabel="جارٍ حذف المنتج" className="text-xs font-medium text-error hover:underline">حذف</ConfirmSubmit></ActionForm></div></td>
+                  <td className="w-[190px] whitespace-nowrap p-4"><div className="flex flex-nowrap items-center gap-3 whitespace-nowrap"><ActionForm action={async () => { "use server"; return toggleProductPublication(product.id, product.is_active); }} feedbackPlacement="toast" successMessage="تم تحديث حالة نشر المنتج."><SubmitButton spinnerOnly pendingLabel="جارٍ تحديث حالة النشر" ariaLabel={product.is_active ? "إيقاف نشر المنتج" : "نشر المنتج"} className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg px-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${product.is_active ? "border border-border bg-white text-text hover:bg-slate-50" : "bg-primary text-white hover:bg-primary-hover"}`}>{product.is_active ? "إيقاف" : "نشر"}</SubmitButton></ActionForm><Link href={`/admin/products/${product.id}`} className="text-xs font-medium text-primary hover:underline">تعديل</Link><ProductDeleteButton action={async () => { "use server"; return deleteProduct(product.id); }} /></div></td>
                 </tr>;
               })}
             </tbody>
@@ -96,5 +97,6 @@ export default async function AdminProductsPage({
       )}
       {!productsError && (count ?? 0) > pageSize ? <nav aria-label="صفحات المنتجات" className="flex items-center justify-between rounded-xl border border-border bg-white p-4 text-sm"><span className="text-muted">صفحة {page} من {Math.ceil((count ?? 0) / pageSize)}</span><div className="flex gap-2">{page > 1 ? <Link href={{ query: { ...params, page: String(page - 1) } }} className="rounded-lg border border-border px-4 py-2">السابق</Link> : null}{page < Math.ceil((count ?? 0) / pageSize) ? <Link href={{ query: { ...params, page: String(page + 1) } }} className="rounded-lg border border-border px-4 py-2">التالي</Link> : null}</div></nav> : null}
     </div>
+    </ProductDeleteProvider>
   );
 }

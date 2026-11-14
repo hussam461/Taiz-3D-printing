@@ -107,7 +107,7 @@ export function isOriginalSeedLegalBody(slug: string, body: string) {
 }
 
 export function serializeLegalSections(sections: LegalSection[]) {
-  return sections.map((section) => `## ${section.title}\n${section.paragraphs.join("\n\n")}`).join("\n\n");
+  return sections.map((section) => [section.title.trim() ? `## ${section.title.trim()}` : "", section.paragraphs.join("\n\n")].filter(Boolean).join("\n")).join("\n\n");
 }
 
 export function parseLegalSections(body: string, fallback?: LegalPageTemplate | null): LegalSection[] {
@@ -123,7 +123,7 @@ export function parseLegalSections(body: string, fallback?: LegalPageTemplate | 
     } else if (current) {
       current.paragraphs.push(block.replace(/^\s*##\s+/gm, "").trim());
     } else {
-      sections.push({ title: "المعلومات", paragraphs: [block] });
+      current = { title: "", paragraphs: [block] };
     }
   }
   if (current) sections.push(current);

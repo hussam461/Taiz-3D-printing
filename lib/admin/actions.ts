@@ -501,7 +501,6 @@ export async function deleteProduct(id: string) {
     }
   }
   if (removablePaths.length > 0) await supabase.storage.from("product-images").remove(removablePaths);
-  revalidatePath("/admin/products");
   revalidatePath("/products");
   return { ok: true as const };
 }

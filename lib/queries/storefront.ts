@@ -305,6 +305,19 @@ export async function searchProducts(query: ProductListQuery) {
   const to = from + pageSize - 1;
   const term = query.q?.replace(/[^\p{L}\p{N}\s-]/gu, " ").trim();
   const sort = query.sort ?? (term ? "relevance" : "newest");
+  if (query.category) {
+    const { data: category, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("slug", query.category)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (categoryError) {
+      console.error("Active category lookup failed", { slug: query.category, error: categoryError });
+      return { items: [] as ProductCard[], total: 0, page, pageSize };
+    }
+    if (!category) return { items: [] as ProductCard[], total: 0, page, pageSize };
+  }
   const buildRequest = () => {
     let request = supabase
       .from("products")

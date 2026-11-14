@@ -14,8 +14,14 @@ import { HeroCarousel } from "@/components/storefront/hero-carousel";
 import { CategoryCarousel } from "@/components/storefront/category-carousel";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import { HomepageBenefitCard } from "@/components/storefront/homepage-benefit-card";
+import { Suspense } from "react";
+import { StorefrontPageLoading } from "@/components/storefront/page-loading";
 
-export default async function HomePage() {
+export default function HomePage() {
+  return <Suspense fallback={<StorefrontPageLoading kind="home" />}><HomePageContent /></Suspense>;
+}
+
+async function HomePageContent() {
   const [{ store }, categories, featured, latest, slides, benefits, colors, materials] = await Promise.all([
     getStorefrontContext(),
     getActiveCategories(),

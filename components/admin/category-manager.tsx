@@ -1,34 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { saveCategory, deleteSimpleRow, saveStoreSettings } from "@/lib/admin/actions";
 import { ActionForm, SubmitButton } from "@/components/admin/action-form";
 import { SaveChangesForm } from "@/components/admin/save-changes-form";
-import { ConfirmSubmit } from "@/components/admin/confirm-submit";
+import { ConfirmSubmit, WarningDialogButton } from "@/components/admin/confirm-submit";
 import { PRODUCT_IMAGE_MIME_TYPES } from "@/lib/validation/product";
 
 type Category = { id: string; name: string; slug: string; is_active: boolean; sort_order: number; product_count: number; image_url: string | null };
 
 export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl }: { rows: Category[]; allProductsImageUrl: string | null; customOrderImageUrl: string | null }) {
-  const [blockedDeleteId, setBlockedDeleteId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [dirtyRows, setDirtyRows] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    if (!blockedDeleteId) return;
-    const alert = document.getElementById("category-delete-alert");
-    if (alert) {
-      alert.scrollIntoView({ behavior: "smooth", block: "center" });
-      alert.focus({ preventScroll: true });
-    }
-    const timer = window.setTimeout(() => setBlockedDeleteId(null), 5000);
-    const dismissOnPointer = () => setBlockedDeleteId(null);
-    document.addEventListener("pointerdown", dismissOnPointer);
-    return () => {
-      window.clearTimeout(timer);
-      document.removeEventListener("pointerdown", dismissOnPointer);
-    };
-  }, [blockedDeleteId]);
   return <div className="space-y-6">
     <SaveChangesForm action={saveStoreSettings} successMessage="تم حفظ صور بطاقات الاختصار." title="صور بطاقات الاختصار" description="هذه الصور تخص بطاقتي «جميع المنتجات» و«طلب مخصص» اللتين تظهران بجانب التصنيفات في الصفحة الرئيسية. مقاس 800 × 600 بكسل مناسب." buttonLabel="حفظ التعديلات">
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -116,10 +100,7 @@ export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl
             <SubmitButton disabled={!dirtyRows[category.id]} pendingLabel="جارٍ الحفظ..." className="min-h-9 w-full rounded-lg bg-primary px-2 text-xs font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">حفظ التعديلات</SubmitButton>
           </ActionForm>
           {category.product_count > 0 ? <div className="mt-2 border-t border-border pt-2">
-            <button type="button" onClick={() => setBlockedDeleteId(blockedDeleteId === category.id ? null : category.id)} className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</button>
-            {blockedDeleteId === category.id ? <div id="category-delete-alert" role="alert" tabIndex={-1} className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[10px] leading-4 text-amber-950 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 sm:text-xs">
-              لا يمكن حذفه لارتباطه بـ <strong>{category.product_count.toLocaleString("ar-YE-u-nu-latn")} منتج</strong>. أخفِ التصنيف بدلًا من ذلك.
-            </div> : null}
+            <WarningDialogButton title="لا يمكن حذف التصنيف" message={<>التصنيف مرتبط بـ <strong className="text-text">{category.product_count.toLocaleString("ar-YE-u-nu-latn")} منتج</strong>. أخفِ التصنيف بدلًا من حذفه.</>} className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</WarningDialogButton>
           </div> : <ActionForm action={deleteSimpleRow.bind(null, "categories", category.id)} successMessage="تم حذف التصنيف." className="mt-2 border-t border-border pt-2">
             <ConfirmSubmit compact spinnerOnly pendingLabel="جارٍ حذف التصنيف" message="هل تريد حذف هذا التصنيف؟ لا يمكن التراجع عن العملية." className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</ConfirmSubmit>
           </ActionForm>}

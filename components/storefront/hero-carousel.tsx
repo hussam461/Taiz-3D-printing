@@ -114,7 +114,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
       aria-label="العروض والخدمات الرئيسية"
       aria-roledescription="معرض شرائح"
       aria-live="off"
-      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-navy sm:aspect-auto sm:h-[clamp(28rem,34.4vw,41.25rem)]"
+      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-navy lg:aspect-auto lg:h-[clamp(28rem,34.4vw,41.25rem)]"
       onPointerDown={(event) => { pointerStartX.current = event.clientX; suppressClick.current = false; }}
       onPointerUp={(event) => {
         if (pointerStartX.current === null) return;
@@ -144,7 +144,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
           return (
             <div key={item.id} className={`absolute inset-0 ${isActive ? `z-20 opacity-100 ${previousIndex !== null && !prefersReducedMotion ? "hero-slide-enter" : ""}` : "z-10 opacity-100"}`}>
               <Image src={item.image_url} alt="" fill sizes="100vw" unoptimized aria-hidden="true" className="scale-110 object-cover object-center opacity-60 blur-2xl" />
-              <Image src={item.image_url} alt="" fill priority={isActive && activeIndex === 0} sizes="100vw" unoptimized className="z-10 object-contain object-center sm:object-cover" />
+              <Image src={item.image_url} alt="" fill priority={isActive && activeIndex === 0} sizes="100vw" unoptimized className="z-10 object-contain object-center lg:object-cover" />
               <div className="absolute inset-0 z-20 bg-gradient-to-b from-navy/10 via-transparent to-navy/35" />
             </div>
           );
