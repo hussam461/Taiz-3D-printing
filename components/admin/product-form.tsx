@@ -43,6 +43,83 @@ type ActionState =
 
 const initialState: ActionState = null;
 
+function CategoryMultiSelect({
+  categories,
+  defaultValue,
+  invalid,
+  describedBy,
+  onChange,
+}: {
+  categories: { id: string; name: string }[];
+  defaultValue: string[];
+  invalid: boolean;
+  describedBy: string;
+  onChange: () => void;
+}) {
+  const [selectedIds, setSelectedIds] = useState(defaultValue);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const selectedNames = categories.filter((category) => selectedIds.includes(category.id)).map((category) => category.name);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutside(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    document.addEventListener("mousedown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  function toggleCategory(categoryId: string) {
+    setSelectedIds((current) => current.includes(categoryId)
+      ? current.filter((id) => id !== categoryId)
+      : [...current, categoryId]);
+    onChange();
+  }
+
+  return <div ref={containerRef} className="relative">
+    {selectedIds.map((categoryId) => <input key={categoryId} type="hidden" name="category_ids" value={categoryId} />)}
+    <button
+      ref={triggerRef}
+      id="category_ids"
+      type="button"
+      aria-haspopup="true"
+      aria-expanded={open}
+      aria-controls="category_ids-options"
+      aria-invalid={invalid}
+      aria-describedby={describedBy}
+      onClick={() => setOpen((value) => !value)}
+      className={`${inputClass} flex items-center justify-between gap-3 text-start ${invalid ? "border-red-500" : ""}`}
+    >
+      <span className={`min-w-0 truncate ${selectedNames.length ? "text-text" : "text-slate-400"}`}>
+        {selectedNames.length ? selectedNames.join("، ") : "اختر تصنيفًا أو أكثر"}
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        {selectedIds.length ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">{selectedIds.length} مختارة</span> : null}
+        <span aria-hidden="true" className={`text-muted transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
+      </span>
+    </button>
+    {open ? <div id="category_ids-options" role="group" aria-label="تصنيفات المنتج" className="absolute inset-x-0 top-full z-30 mt-2 max-h-56 overflow-y-auto rounded-xl border border-border bg-white p-2 shadow-xl">
+      {categories.map((category) => <label key={category.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-text transition hover:bg-primary/5">
+        <input type="checkbox" checked={selectedIds.includes(category.id)} onChange={() => toggleCategory(category.id)} className="h-4 w-4 shrink-0 accent-primary" />
+        <span className="min-w-0 flex-1 truncate">{category.name}</span>
+        {selectedIds.includes(category.id) ? <span aria-hidden="true" className="text-sm font-bold text-primary">✓</span> : null}
+      </label>)}
+    </div> : null}
+  </div>;
+}
+
 async function compressProductImage(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);
   try {
@@ -118,12 +195,14 @@ function Field({
 export function ProductForm({
   categories,
   product,
+  selectedCategoryIds,
   currentImage,
   legacyImageCount = 0,
   createdNotice = false,
 }: {
   categories: { id: string; name: string }[];
   product?: Product;
+  selectedCategoryIds?: string[];
   currentImage?: ProductImage | null;
   legacyImageCount?: number;
   createdNotice?: boolean;
@@ -403,7 +482,7 @@ export function ProductForm({
   const fieldNames: Record<keyof ProductFieldErrors, string> = {
     name: "اسم المنتج",
     description: "الوصف",
-    category_id: "التصنيف",
+    category_ids: "التصنيفات",
     base_price_old_yer: "السعر الأساسي",
     discount_percent: "نسبة الخصم",
     image: "صورة المنتج",
@@ -451,11 +530,14 @@ export function ProductForm({
           <Field id="name" label="اسم المنتج" required error={fieldErrors.name}>
             <input id="name" name="name" defaultValue={product?.name ?? ""} required minLength={2} maxLength={120} autoComplete="off" aria-required="true" aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? "name-error" : "name-hint"} placeholder="مثال: حامل أقلام مكتبي" className={inputClass} onChange={() => clearFieldError("name")} />
           </Field>
-          <Field id="category_id" label="التصنيف" required error={fieldErrors.category_id}>
-            <select id="category_id" name="category_id" defaultValue={product?.category_id ?? ""} required aria-required="true" aria-invalid={Boolean(fieldErrors.category_id)} aria-describedby={fieldErrors.category_id ? "category_id-error" : "category_id-hint"} className={inputClass} onChange={() => clearFieldError("category_id")}>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-            {categories.length === 0 ? <p className="text-xs text-warning">لا توجد تصنيفات متاحة. أنشئ تصنيفًا أولًا قبل حفظ المنتج.</p> : null}
+          <Field id="category_ids" label="التصنيفات" required error={fieldErrors.category_ids} hint="اختر تصنيفًا واحدًا أو أكثر، وسيظهر المنتج في كل تصنيف تختاره.">
+            {categories.length ? <CategoryMultiSelect
+              categories={categories}
+              defaultValue={selectedCategoryIds?.length ? selectedCategoryIds : product ? [product.category_id] : []}
+              invalid={Boolean(fieldErrors.category_ids)}
+              describedBy={fieldErrors.category_ids ? "category_ids-error category_ids-hint" : "category_ids-hint"}
+              onChange={() => clearFieldError("category_ids")}
+            /> : <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-warning">لا توجد تصنيفات متاحة. أنشئ تصنيفًا أولًا قبل حفظ المنتج.</p>}
           </Field>
           <Field id="description" label="وصف المنتج" required error={fieldErrors.description} className="col-span-2">
             <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">

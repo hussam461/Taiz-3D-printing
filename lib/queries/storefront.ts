@@ -243,43 +243,52 @@ function mapProducts(
 export async function getFeaturedProducts(): Promise<ProductCard[]> {
   const supabase = await db();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
     .select(
-      "id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories(id, name, slug), product_images(storage_path, is_main)",
+      "id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey(id, name, slug), product_images(storage_path, is_main)",
     )
     .eq("is_active", true)
     .eq("is_featured", true)
     .order("created_at", { ascending: false })
     .limit(8);
+  if (error) {
+    console.error("Featured products could not be loaded", { error });
+    return [];
+  }
   return mapProducts(data ?? []);
 }
 
 export async function getLatestProducts(): Promise<ProductCard[]> {
   const supabase = await db();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
     .select(
-      "id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories(id, name, slug), product_images(storage_path, is_main)",
+      "id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey(id, name, slug), product_images(storage_path, is_main)",
     )
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(8);
+  if (error) {
+    console.error("Latest products could not be loaded", { error });
+    return [];
+  }
   return mapProducts(data ?? []);
 }
 
 export async function getRelatedProducts(categorySlug: string, excludeProductId: string): Promise<ProductCard[]> {
   const supabase = await db();
   if (!supabase || !categorySlug) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
-    .select("id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!inner(id, name, slug), product_images(storage_path, is_main)")
+    .select("id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey!inner(id, name, slug), product_images(storage_path, is_main)")
     .eq("is_active", true)
     .eq("categories.slug", categorySlug)
     .neq("id", excludeProductId)
     .order("created_at", { ascending: false })
     .limit(8);
+  if (error) console.error("Related products could not be loaded", { categorySlug, error });
   return mapProducts(data ?? []);
 }
 
@@ -305,6 +314,7 @@ export async function searchProducts(query: ProductListQuery) {
   const to = from + pageSize - 1;
   const term = query.q?.replace(/[^\p{L}\p{N}\s-]/gu, " ").trim();
   const sort = query.sort ?? (term ? "relevance" : "newest");
+  let selectedCategoryId: string | null = null;
   if (query.category) {
     const { data: category, error: categoryError } = await supabase
       .from("categories")
@@ -317,16 +327,18 @@ export async function searchProducts(query: ProductListQuery) {
       return { items: [] as ProductCard[], total: 0, page, pageSize };
     }
     if (!category) return { items: [] as ProductCard[], total: 0, page, pageSize };
+    selectedCategoryId = category.id;
   }
-  const buildRequest = () => {
+  const buildRequest = (includeMembership = Boolean(selectedCategoryId)) => {
+    const membershipRelation = includeMembership ? ", product_categories!inner(category_id)" : "";
     let request = supabase
       .from("products")
       .select(
-        `id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories${query.category ? "!inner" : ""}(id, name, slug), product_images(storage_path, is_main)`,
+        `id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey(id, name, slug), product_images(storage_path, is_main)${membershipRelation}`,
         { count: "exact" },
       )
       .eq("is_active", true);
-    if (query.category) request = request.eq("categories.slug", query.category);
+    if (selectedCategoryId) request = request.eq("product_categories.category_id", selectedCategoryId);
     if (query.featured) request = request.eq("is_featured", true);
     if (query.discounted) request = request.not("discount_percent", "is", null);
     if (query.minPrice != null) request = request.gte("base_price_old_yer", query.minPrice);
@@ -338,38 +350,20 @@ export async function searchProducts(query: ProductListQuery) {
   };
 
   if (term) {
-    const { data: matchedCategories, error: categoryError } = await supabase
-      .from("categories")
-      .select("id")
-      .eq("is_active", true)
-      .ilike("name", `%${term}%`);
+    const { data: matchedCategoryProducts, error: categoryError } = await supabase.rpc("storefront_product_ids_by_category_name", { p_term: term });
     if (categoryError) console.error("Product search category lookup failed", { error: categoryError });
-    const categoryIds = (matchedCategories ?? []).map((category) => category.id);
+    const categoryProductIds = [...new Set((matchedCategoryProducts ?? []).map((row) => row.product_id))];
     const productFilter = `name.ilike.%${term}%,description.ilike.%${term}%`;
     const nameRequest = buildRequest().or(productFilter).range(0, to);
-    if (!categoryIds.length) {
+    if (!categoryProductIds.length) {
       const { data, count, error } = await nameRequest;
       if (error) console.error("Product search failed", { error });
       return { items: mapProducts(data ?? []), total: count ?? 0, page, pageSize };
     }
 
-    const categoryRequest = buildRequest().in("category_id", categoryIds).range(0, to);
-    let overlapRequest = supabase
-      .from("products")
-      .select("id, categories!inner(slug)", { count: "exact", head: true })
-      .eq("is_active", true)
-      .in("category_id", categoryIds)
-      .or(productFilter);
-    if (query.category) overlapRequest = overlapRequest.eq("categories.slug", query.category);
-    if (query.featured) overlapRequest = overlapRequest.eq("is_featured", true);
-    if (query.discounted) overlapRequest = overlapRequest.not("discount_percent", "is", null);
-    if (query.minPrice != null) overlapRequest = overlapRequest.gte("base_price_old_yer", query.minPrice);
-    if (query.maxPrice != null) overlapRequest = overlapRequest.lte("base_price_old_yer", query.maxPrice);
-    const [nameResult, categoryResult, overlapResult] = await Promise.all([
-      nameRequest,
-      categoryRequest,
-      overlapRequest,
-    ]);
+    const categoryRequest = buildRequest().in("id", categoryProductIds).range(0, to);
+    const overlapRequest = buildRequest().in("id", categoryProductIds).or(productFilter).range(0, 0);
+    const [nameResult, categoryResult, overlapResult] = await Promise.all([nameRequest, categoryRequest, overlapRequest]);
     if (nameResult.error) console.error("Product name search failed", { error: nameResult.error });
     if (categoryResult.error) console.error("Product category search failed", { error: categoryResult.error });
     if (overlapResult.error) console.error("Product search count failed", { error: overlapResult.error });
@@ -392,14 +386,15 @@ export async function searchProducts(query: ProductListQuery) {
 export const getProductBySlug = cache(async (slug: string) => {
   const supabase = await db();
   if (!supabase) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
     .select(
-      "*, categories(id, name, slug), product_images(id, storage_path, alt_text, sort_order, is_main)",
+      "*, categories!products_category_id_fkey(id, name, slug), product_images(id, storage_path, alt_text, sort_order, is_main)",
     )
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
+  if (error) console.error("Product details could not be loaded", { slug, error });
   return data;
 });
 

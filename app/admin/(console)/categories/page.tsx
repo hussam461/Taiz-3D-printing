@@ -4,15 +4,12 @@ import { publicMediaUrl } from "@/lib/storage/public-url";
 
 export default async function Page() {
   const supabase = await createServerSupabase();
-  const [{ data }, { data: productRows }, { data: storeSettings }] = await Promise.all([
+  const [{ data }, { data: productCountsRows }, { data: storeSettings }] = await Promise.all([
     supabase.from("categories").select("*").order("sort_order"),
-    supabase.from("products").select("category_id").not("category_id", "is", null),
+    supabase.rpc("admin_get_category_product_counts"),
     supabase.from("store_settings").select("all_products_image_path, custom_order_image_path").eq("id", 1).maybeSingle(),
   ]);
-  const productCounts = new Map<string, number>();
-  for (const row of productRows ?? []) {
-    if (row.category_id) productCounts.set(row.category_id, (productCounts.get(row.category_id) ?? 0) + 1);
-  }
+  const productCounts = new Map((productCountsRows ?? []).map((row) => [row.category_id, Number(row.product_count)]));
   return (
     <div>
       <div className="mb-6">

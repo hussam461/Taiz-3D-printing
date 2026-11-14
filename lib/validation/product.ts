@@ -73,7 +73,7 @@ const productFieldsSchema = z.object({
   description: z.string().min(1, "وصف المنتج مطلوب.").max(20_000, "وصف المنتج طويل جدًا.")
     .transform(sanitizeProductDescriptionMarkup)
     .refine((value) => productDescriptionToText(value).trim().length > 0, "وصف المنتج مطلوب."),
-  category_id: z.string().uuid("اختر تصنيفًا صالحًا."),
+  category_ids: z.array(z.string().uuid("اختر تصنيفات صالحة.")).min(1, "اختر تصنيفًا واحدًا على الأقل."),
   base_price_old_yer: z
     .string()
     .trim()
@@ -94,7 +94,7 @@ const productFieldsSchema = z.object({
 export type ProductFieldErrors = Partial<Record<
   | "name"
   | "description"
-  | "category_id"
+  | "category_ids"
   | "base_price_old_yer"
   | "discount_percent"
   | "image"
@@ -105,7 +105,7 @@ export type ProductFieldErrors = Partial<Record<
 export type ParsedProductForm = {
   name: string;
   description: string;
-  categoryId: string;
+  categoryIds: string[];
   basePriceOldYer: number;
   discountPercent: number | null;
   isActive: boolean;
@@ -121,7 +121,7 @@ export function parseProductForm(formData: FormData):
   const result = productFieldsSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description"),
-    category_id: formData.get("category_id"),
+    category_ids: formData.getAll("category_ids").map((value) => String(value)),
     base_price_old_yer: formData.get("base_price_old_yer"),
     discount_percent: formData.get("discount_percent") ?? "",
     is_active: formData.get("is_active") === "on",
@@ -166,7 +166,7 @@ export function parseProductForm(formData: FormData):
     data: {
       name: result.data.name,
       description: sanitizeProductDescriptionMarkup(result.data.description),
-      categoryId: result.data.category_id,
+      categoryIds: [...new Set(result.data.category_ids)],
       basePriceOldYer: result.data.base_price_old_yer,
       discountPercent: result.data.discount_percent && result.data.discount_percent > 0 ? result.data.discount_percent : null,
       isActive: result.data.is_active,
@@ -181,7 +181,7 @@ export function parseProductForm(formData: FormData):
 const productFieldNames = {
   name: true,
   description: true,
-  category_id: true,
+  category_ids: true,
   base_price_old_yer: true,
   discount_percent: true,
   is_active: true,

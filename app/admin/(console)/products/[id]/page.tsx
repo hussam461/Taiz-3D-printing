@@ -13,7 +13,7 @@ export default async function EditProductPage({
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const supabase = await createServerSupabase();
   const [{ data: product, error: productError }, { data: categories }, { data: images }] = await Promise.all([
-    supabase.from("products").select("*").eq("id", id).maybeSingle(),
+    supabase.from("products").select("*, product_categories(category_id)").eq("id", id).maybeSingle(),
     supabase.from("categories").select("id, name").order("sort_order"),
     supabase.from("product_images").select("id, storage_path, alt_text, is_main").eq("product_id", id).order("is_main", { ascending: false }).order("sort_order").order("created_at"),
   ]);
@@ -22,7 +22,7 @@ export default async function EditProductPage({
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader eyebrow="الكتالوج / تعديل" title={product.name} description="راجع بيانات المنتج وصورته الحالية، ثم احفظ التغييرات عند الانتهاء." />
-      <ProductForm categories={categories ?? []} product={product} currentImage={productImages[0] ?? null} legacyImageCount={productImages.length} createdNotice={query.saved === "created"} />
+      <ProductForm categories={categories ?? []} product={product} selectedCategoryIds={(product.product_categories ?? []).map((row) => row.category_id)} currentImage={productImages[0] ?? null} legacyImageCount={productImages.length} createdNotice={query.saved === "created"} />
     </div>
   );
 }

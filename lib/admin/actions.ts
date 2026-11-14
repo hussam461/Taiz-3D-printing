@@ -397,7 +397,7 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
   const slug = id ? String(formData.get("current_slug") ?? "") : `product-${crypto.randomUUID().slice(0, 8)}`;
   if (id && !slug) return { ok: false, error: "تعذر تحديد رابط المنتج الحالي. أعد فتح الصفحة وحاول مرة أخرى." };
   const payload = {
-    name: data.name, slug, description: data.description, category_id: data.categoryId,
+    name: data.name, slug, description: data.description,
     base_price_old_yer: data.basePriceOldYer, discount_percent: data.discountPercent,
     is_active: data.isActive, is_featured: data.isActive && data.isFeatured,
     specifications: data.specifications, seo_title: data.seoTitle, seo_description: data.seoDescription,
@@ -412,13 +412,24 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
       return { ok: false, error: error.code === "23505" ? "اسم الرابط مستخدم بالفعل. أعد فتح المنتج أو تواصل مع الدعم." : "تعذر حفظ التعديلات. تحقق من اتصالك وحاول مرة أخرى." };
     }
   } else {
-    const { data: product, error } = await supabase.from("products").insert(payload).select("id").single();
+    const { data: product, error } = await supabase.from("products").insert({ ...payload, category_id: data.categoryIds[0] }).select("id").single();
     if (error || !product) {
       console.error("Product creation failed", { error });
       return { ok: false, error: error?.code === "23503" ? "التصنيف لم يعد متاحًا. اختر تصنيفًا آخر." : error?.code === "23505" ? "تعذر إنشاء رابط فريد للمنتج. حاول مرة أخرى." : "تعذر إنشاء المنتج. تحقق من اتصالك وصلاحيات الحساب ثم حاول مرة أخرى." };
     }
     productId = product.id;
     created = true;
+  }
+
+  const { error: categoryError } = await supabase.rpc("admin_set_product_categories", {
+    p_product_id: productId,
+    p_category_ids: data.categoryIds,
+  });
+  if (categoryError) {
+    console.error("Product category update failed", { productId, error: categoryError });
+    if (created) await supabase.from("products").delete().eq("id", productId);
+    if (uploadedImagePath) await supabase.storage.from("product-images").remove([uploadedImagePath]);
+    return { ok: false, error: "تعذر حفظ تصنيفات المنتج. تأكد من تحديث قاعدة البيانات ثم حاول مرة أخرى.", fieldErrors: { category_ids: "لم يتم حفظ التصنيفات." } };
   }
 
   if (uploadedImagePath && uploadedImageMimeType) {
@@ -474,6 +485,37 @@ export async function toggleProductPublication(id: string, currentlyActive: bool
   revalidatePath(`/admin/products/${id}`);
   revalidatePath("/products");
   return { ok: true as const };
+}
+
+export async function loadMoreAdminProducts(
+  filters: { q?: string; category?: string; status?: string; sort?: string; featured?: string },
+  offset: number,
+) {
+  await requireAdmin();
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100_000) {
+    return { ok: false as const, error: "تعذر متابعة تحميل المنتجات. حدّث الصفحة وحاول مرة أخرى." };
+  }
+  const supabase = await createServerSupabase();
+  const relation = filters.category ? "product_categories!inner" : "product_categories";
+  let query = supabase.from("products").select(
+    `id, name, slug, base_price_old_yer, discount_percent, is_active, is_featured, created_at, updated_at, ${relation}(category_id, categories(name)), product_images(storage_path, is_main)`,
+  );
+  const searchTerm = filters.q?.replace(/[%_]/g, " ").trim();
+  if (searchTerm) query = query.ilike("name", `%${searchTerm}%`);
+  if (filters.status === "active") query = query.eq("is_active", true);
+  if (filters.status === "inactive") query = query.eq("is_active", false);
+  if (filters.featured === "1") query = query.eq("is_featured", true);
+  if (filters.category) query = query.eq("product_categories.category_id", filters.category);
+  const orderColumn = filters.sort === "name" ? "name" : filters.sort === "price" || filters.sort === "price_desc" ? "base_price_old_yer" : "created_at";
+  const { data, error } = await query
+    .order(orderColumn, { ascending: filters.sort === "name" || filters.sort === "price" })
+    .order("id", { ascending: true })
+    .range(offset, offset + 9);
+  if (error) {
+    console.error("Admin product batch could not be loaded", { offset, error });
+    return { ok: false as const, error: "تعذر تحميل المنتجات الإضافية. تحقق من الاتصال ثم حاول مرة أخرى." };
+  }
+  return { ok: true as const, products: data ?? [] };
 }
 
 export async function deleteProduct(id: string) {

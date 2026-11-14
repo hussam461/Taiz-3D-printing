@@ -109,6 +109,10 @@ from (
 join public.categories c on c.slug = v.cat
 where not exists (select 1 from public.products p where p.slug = v.slug);
 
+insert into public.product_categories (product_id, category_id, sort_order)
+select id, category_id, 0 from public.products
+on conflict (product_id, category_id) do nothing;
+
 insert into public.product_images (product_id, storage_path, alt_text, sort_order, is_main)
 select p.id, '/placeholders/product.svg', p.name, 0, true
 from public.products p
