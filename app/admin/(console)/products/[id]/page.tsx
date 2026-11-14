@@ -19,10 +19,11 @@ export default async function EditProductPage({
   ]);
   if (productError || !product) notFound();
   const productImages = images ?? [];
+  const selectedCategoryRows = (product.product_categories ?? []) as { category_id: string }[];
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader eyebrow="الكتالوج / تعديل" title={product.name} description="راجع بيانات المنتج وصورته الحالية، ثم احفظ التغييرات عند الانتهاء." />
-      <ProductForm categories={categories ?? []} product={product} selectedCategoryIds={(product.product_categories ?? []).map((row) => row.category_id)} currentImage={productImages[0] ?? null} legacyImageCount={productImages.length} createdNotice={query.saved === "created"} />
+      <ProductForm categories={categories ?? []} product={product} selectedCategoryIds={selectedCategoryRows.map((row) => row.category_id)} currentImage={productImages[0] ?? null} legacyImageCount={productImages.length} createdNotice={query.saved === "created"} />
     </div>
   );
 }

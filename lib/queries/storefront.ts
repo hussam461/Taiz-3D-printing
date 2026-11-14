@@ -330,29 +330,31 @@ export async function searchProducts(query: ProductListQuery) {
     selectedCategoryId = category.id;
   }
   const buildRequest = (includeMembership = Boolean(selectedCategoryId)) => {
-    const membershipRelation = includeMembership ? ", product_categories!inner(category_id)" : "";
-    let request = supabase
-      .from("products")
-      .select(
-        `id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey(id, name, slug), product_images(storage_path, is_main)${membershipRelation}`,
-        { count: "exact" },
-      )
-      .eq("is_active", true);
-    if (selectedCategoryId) request = request.eq("product_categories.category_id", selectedCategoryId);
-    if (query.featured) request = request.eq("is_featured", true);
-    if (query.discounted) request = request.not("discount_percent", "is", null);
-    if (query.minPrice != null) request = request.gte("base_price_old_yer", query.minPrice);
-    if (query.maxPrice != null) request = request.lte("base_price_old_yer", query.maxPrice);
-    if (sort === "price_asc") request = request.order("base_price_old_yer", { ascending: true });
-    else if (sort === "price_desc") request = request.order("base_price_old_yer", { ascending: false });
-    else request = request.order("created_at", { ascending: false });
-    return request;
+    const request = includeMembership
+      ? supabase.from("products").select(
+          "id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey(id, name, slug), product_images(storage_path, is_main), product_categories!inner(category_id)",
+          { count: "exact" },
+        )
+      : supabase.from("products").select(
+          "id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey(id, name, slug), product_images(storage_path, is_main)",
+          { count: "exact" },
+        );
+    let filteredRequest = request.eq("is_active", true);
+    if (selectedCategoryId) filteredRequest = filteredRequest.eq("product_categories.category_id", selectedCategoryId);
+    if (query.featured) filteredRequest = filteredRequest.eq("is_featured", true);
+    if (query.discounted) filteredRequest = filteredRequest.not("discount_percent", "is", null);
+    if (query.minPrice != null) filteredRequest = filteredRequest.gte("base_price_old_yer", query.minPrice);
+    if (query.maxPrice != null) filteredRequest = filteredRequest.lte("base_price_old_yer", query.maxPrice);
+    if (sort === "price_asc") filteredRequest = filteredRequest.order("base_price_old_yer", { ascending: true });
+    else if (sort === "price_desc") filteredRequest = filteredRequest.order("base_price_old_yer", { ascending: false });
+    else filteredRequest = filteredRequest.order("created_at", { ascending: false });
+    return filteredRequest;
   };
 
   if (term) {
     const { data: matchedCategoryProducts, error: categoryError } = await supabase.rpc("storefront_product_ids_by_category_name", { p_term: term });
     if (categoryError) console.error("Product search category lookup failed", { error: categoryError });
-    const categoryProductIds = [...new Set((matchedCategoryProducts ?? []).map((row) => row.product_id))];
+    const categoryProductIds = [...new Set(((matchedCategoryProducts ?? []) as { product_id: string }[]).map((row) => row.product_id))];
     const productFilter = `name.ilike.%${term}%,description.ilike.%${term}%`;
     const nameRequest = buildRequest().or(productFilter).range(0, to);
     if (!categoryProductIds.length) {

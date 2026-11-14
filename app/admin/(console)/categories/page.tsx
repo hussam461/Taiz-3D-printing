@@ -9,7 +9,7 @@ export default async function Page() {
     supabase.rpc("admin_get_category_product_counts"),
     supabase.from("store_settings").select("all_products_image_path, custom_order_image_path").eq("id", 1).maybeSingle(),
   ]);
-  const productCounts = new Map((productCountsRows ?? []).map((row) => [row.category_id, Number(row.product_count)]));
+  const productCounts = new Map(((productCountsRows ?? []) as { category_id: string; product_count: number }[]).map((row) => [row.category_id, Number(row.product_count)]));
   return (
     <div>
       <div className="mb-6">
