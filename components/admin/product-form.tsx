@@ -7,6 +7,7 @@ import { createProductImageUploadUrl, discardProductImageUpload, upsertProduct }
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import { FeedbackNotice } from "@/components/admin/feedback-notice";
 import { publicMediaUrl } from "@/lib/storage/public-url";
+import { compressImageToWebp } from "@/lib/compress-image";
 import {
   PRODUCT_IMAGE_MAX_BYTES,
   PRODUCT_IMAGE_MIME_TYPES,
@@ -15,6 +16,8 @@ import {
   validateProductImageMetadata,
   type ProductFieldErrors,
 } from "@/lib/validation/product";
+
+const PUBLIC_MEDIA_CACHE_CONTROL = "31536000";
 
 const inputClass = "w-full rounded-xl border border-border bg-white px-3.5 py-3 text-sm text-text shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 aria-[invalid=true]:border-red-500 aria-[invalid=true]:focus:ring-red-500/10";
 
@@ -97,7 +100,6 @@ function CategoryMultiSelect({
       aria-haspopup="true"
       aria-expanded={open}
       aria-controls="category_ids-options"
-      aria-invalid={invalid}
       aria-describedby={describedBy}
       onClick={() => setOpen((value) => !value)}
       className={`${inputClass} flex min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden text-start ${invalid ? "border-red-500" : ""}`}
@@ -121,31 +123,7 @@ function CategoryMultiSelect({
 }
 
 async function compressProductImage(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    let scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("تعذر تجهيز الصورة على هذا الجهاز.");
-    for (let resizeAttempt = 0; resizeAttempt < 5; resizeAttempt += 1) {
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      for (const quality of [0.88, 0.82, 0.76, 0.7]) {
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-        if (!blob || blob.type !== "image/webp") throw new Error("تعذر ضغط الصورة بصيغة مناسبة على هذا الجهاز.");
-        if (blob.size <= PRODUCT_IMAGE_MAX_BYTES) {
-          const name = `${file.name.replace(/\.[^.]+$/, "") || "product-image"}.webp`;
-          return new File([blob], name, { type: "image/webp", lastModified: Date.now() });
-        }
-      }
-      scale *= 0.82;
-    }
-    throw new Error("حجم الصورة كبير جدًا. اختر صورة أصغر.");
-  } finally {
-    bitmap.close();
-  }
+  return compressImageToWebp(file, { maxDimension: 2200, maxBytes: PRODUCT_IMAGE_MAX_BYTES });
 }
 
 function initialSpecifications(value: unknown): SpecRow[] {
@@ -456,7 +434,7 @@ export function ProductForm({
         if (!prepared.ok) throw new Error(prepared.error);
         preparedPath = prepared.path;
         const browserSupabase = createBrowserSupabase();
-        const { error } = await browserSupabase.storage.from("product-images").uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type, cacheControl: "3600" });
+        const { error } = await browserSupabase.storage.from("product-images").uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type, cacheControl: PUBLIC_MEDIA_CACHE_CONTROL });
         if (error) throw error;
         path = prepared.path;
         setUploadedImagePath(path);

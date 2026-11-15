@@ -33,7 +33,10 @@ export function ActionForm({ action, children, className, successMessage = "تم
     setVisibleState(state);
     if (state.ok) {
       onSuccessRef.current?.(state, submittedDataRef.current);
-      formRef.current?.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach((input) => { input.value = ""; });
+      formRef.current?.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach((input) => {
+        input.value = "";
+        if (input.dataset.webpImageInput) input.dispatchEvent(new Event("webp-clear"));
+      });
       if (resetOnSuccess) formRef.current?.reset();
     } else onErrorRef.current?.(state);
     if (!state.ok && formRef.current) {

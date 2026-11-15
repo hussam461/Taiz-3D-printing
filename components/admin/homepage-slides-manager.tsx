@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ActionForm, SubmitButton } from "@/components/admin/action-form";
 import { ConfirmSubmit } from "@/components/admin/confirm-submit";
+import { WebpImageInput } from "@/components/admin/webp-image-input";
 import { deleteHomepageSlide, reorderHomepageSlides, saveHomepageSlide } from "@/lib/admin/actions";
 import { PRODUCT_IMAGE_MIME_TYPES, validateProductImageMetadata } from "@/lib/validation/product";
 import type { HomepageSlide } from "@/lib/queries/storefront";
@@ -38,7 +39,14 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
     titleInputRef.current?.focus({ preventScroll: true });
   }, [slide]);
   const chooseFile = (file: File | null) => {
-    if (!file) return;
+    if (!file) {
+      if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+      previewUrl.current = null;
+      setPreview(null);
+      setSelectedFile(null);
+      setImageError(null);
+      return;
+    }
     const validationError = validateProductImageMetadata(file);
     if (validationError) {
       setImageError(validationError);
@@ -66,7 +74,10 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
     setPreview(null);
     setSelectedFile(null);
     setImageError(null);
-    if (imageInputRef.current) imageInputRef.current.value = "";
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+      imageInputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   };
   const currentImage = preview ?? slide?.image_url ?? null;
   const order = slides.map((item) => item.id);
@@ -84,7 +95,7 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
     </> : null}
     {editing ? <button type="button" onClick={() => { clearPreview(); setEditing(false); }} className="rounded-lg px-3 py-2 text-sm font-semibold text-muted transition hover:bg-slate-100">إلغاء</button> : <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-9 items-center rounded-lg border border-border bg-white px-3 text-sm font-semibold text-primary transition hover:bg-blue-50">تعديل</button>}
     <ActionForm action={async () => deleteHomepageSlide(slide.id)} successMessage="تم حذف الشريحة." feedbackPlacement="toast">
-      <ConfirmSubmit message="سيتم حذف الشريحة وصورتها من المعرض." className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" compact spinnerOnly pendingLabel="جارٍ حذف الشريحة">حذف</ConfirmSubmit>
+      <ConfirmSubmit message="سيتم حذف الشريحة وصورتها من المعرض." className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" compact pendingLabel="جارٍ حذف الشريحة">حذف</ConfirmSubmit>
     </ActionForm>
   </div> : onClose ? <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-sm font-semibold text-muted transition hover:bg-slate-100 hover:text-text">إلغاء</button> : null;
 
@@ -118,8 +129,17 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
         <SubmitButton disabled={!slide && !selectedFile} pendingLabel={slide ? "جارٍ الحفظ..." : "جارٍ الإضافة..."} className="min-h-11 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover sm:col-span-2 sm:justify-self-start">{slide ? "حفظ التعديلات" : "إضافة الشريحة"}</SubmitButton>
       </div>
       <div className="order-first space-y-3 lg:order-none">
-        <div className={`relative flex aspect-[2.7/1] items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition ${isDragging ? "border-primary bg-blue-50" : "border-border bg-slate-50"}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); chooseFile(event.dataTransfer.files[0] ?? null); }}>
-          <input ref={imageInputRef} name="slide_image" type="file" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} required={!slide && !selectedFile} onChange={(event) => chooseFile(event.currentTarget.files?.[0] ?? null)} className="sr-only" aria-label="صورة الشريحة بصيغة JPG أو PNG أو WebP، بحد أقصى 5 ميغابايت" />
+        <div className={`relative flex aspect-[2.7/1] items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition ${isDragging ? "border-primary bg-blue-50" : "border-border bg-slate-50"}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+          const file = event.dataTransfer.files[0];
+          if (!file || !imageInputRef.current) return;
+          const transfer = new DataTransfer();
+          transfer.items.add(file);
+          imageInputRef.current.files = transfer.files;
+          imageInputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+        }}>
+          <WebpImageInput ref={imageInputRef} name="slide_image" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} required={!slide && !selectedFile} onChange={(event) => chooseFile(event.currentTarget.files?.[0] ?? null)} onPrepared={chooseFile} onCleared={() => chooseFile(null)} maxDimension={2200} maxBytes={2_000_000} statusClassName="absolute inset-x-2 bottom-2 z-10 rounded-lg bg-white/95 px-2 py-1 text-center text-[11px] shadow-sm" className="sr-only" aria-label="صورة الشريحة بصيغة JPG أو PNG أو WebP، بحد أقصى 5 ميغابايت" />
           {currentImage ? <Image src={currentImage} alt="" fill sizes="(max-width: 1024px) 100vw, 300px" unoptimized className="bg-navy object-cover object-center" /> : <div className="px-4 text-center text-muted"><span aria-hidden="true" className="text-3xl">▧</span><p className="mt-1 text-sm font-semibold">اسحب الصورة إلى هنا</p><p className="mt-1 text-xs">أو اخترها من جهازك</p></div>}
           {slide && !selectedFile && currentImage ? <span className="absolute start-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm">الصورة الحالية</span> : null}
           {selectedFile ? <span className="absolute start-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm">معاينة الصورة الجديدة</span> : null}
@@ -129,7 +149,7 @@ function SlideEditor({ slide, index, slides = [], onClose, onSaved }: { slide?: 
           {selectedFile ? <button type="button" onClick={clearPreview} className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted underline underline-offset-4 hover:text-text">{slide?.image_url ? "إلغاء الاستبدال" : "إزالة الصورة"}</button> : null}
         </div>
         {imageError ? <p className="text-sm font-medium text-red-700" role="alert">{imageError}</p> : null}
-        {selectedFile ? <p className="truncate text-xs text-muted" title={selectedFile.name}>{selectedFile.name} · {formatFileSize(selectedFile.size)} · تُرفع عند الحفظ</p> : <p className="text-xs leading-5 text-muted">JPG أو PNG أو WebP، بحد أقصى 5MB. الأفضل 1920 × 750 بكسل؛ حافظ على العنصر الأساسي في المنتصف لأن الأطراف تُقص قليلًا على الجوال. الصورة الحالية تبقى ما لم تختر بديلًا.</p>}
+        {selectedFile ? <p className="truncate text-xs text-muted" title={selectedFile.name}>{selectedFile.name} · {formatFileSize(selectedFile.size)}</p> : <p className="text-xs leading-5 text-muted">JPG أو PNG أو WebP، وتُضغط تلقائيًا إلى WebP حتى 2MB. الأفضل 1920 × 750 بكسل؛ حافظ على العنصر الأساسي في المنتصف لأن الأطراف تُقص قليلًا على الجوال. الصورة الحالية تبقى ما لم تختر بديلًا.</p>}
       </div>
     </ActionForm>
   </section>;

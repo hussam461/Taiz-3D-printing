@@ -6,6 +6,7 @@ import { saveCategory, deleteSimpleRow, saveStoreSettings } from "@/lib/admin/ac
 import { ActionForm, SubmitButton } from "@/components/admin/action-form";
 import { SaveChangesForm } from "@/components/admin/save-changes-form";
 import { ConfirmSubmit, WarningDialogButton } from "@/components/admin/confirm-submit";
+import { WebpImageInput } from "@/components/admin/webp-image-input";
 import { PRODUCT_IMAGE_MIME_TYPES } from "@/lib/validation/product";
 
 type Category = { id: string; name: string; slug: string; is_active: boolean; sort_order: number; product_count: number; image_url: string | null };
@@ -25,12 +26,12 @@ export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl
             <span className={`absolute start-2 top-2 rounded-full px-2 py-1 text-[9px] font-semibold sm:text-[10px] ${card.url ? "bg-emerald-50/95 text-emerald-700" : "bg-slate-100/95 text-slate-600"}`}>{card.url ? "لها صورة" : "بدون صورة"}</span>
           </div>
           <h3 className="mt-2 truncate text-xs font-semibold text-navy sm:text-sm">{card.title}</h3>
-          <input id={`shortcut-image-${card.name}`} name={card.name} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label={`صورة بطاقة ${card.title}`} />
+          <WebpImageInput id={`shortcut-image-${card.name}`} name={card.name} accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label={`صورة بطاقة ${card.title}`} maxDimension={1400} maxBytes={1_000_000} />
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             <label htmlFor={`shortcut-image-${card.name}`} className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-border px-1.5 text-[10px] font-semibold text-primary transition hover:bg-blue-50 sm:text-xs">{card.url ? "تغيير الصورة" : "إضافة صورة"}</label>
             {card.url ? <label className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-1 text-[10px] font-semibold text-rose-700 sm:text-xs"><input type="checkbox" name={card.removeName} className="h-3.5 w-3.5 accent-rose-600" />حذف الصورة</label> : <span className="flex items-center justify-center text-[9px] text-muted">حتى 5MB</span>}
           </div>
-          <p className="mt-1 text-[9px] leading-4 text-muted sm:text-[10px]">JPG أو PNG أو WebP · حتى 5MB</p>
+          <p className="mt-1 text-[9px] leading-4 text-muted sm:text-[10px]">JPG أو PNG أو WebP · تُحوّل تلقائيًا إلى WebP</p>
         </article>)}
       </div>
     </SaveChangesForm>
@@ -47,8 +48,8 @@ export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl
           إظهار في المتجر
         </label>
         <label className="col-span-2 text-sm font-medium sm:col-span-1">صورة التصنيف <span className="font-normal text-muted">اختيارية</span>
-          <input name="category_image" type="file" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} className="mt-1.5 block w-full text-xs text-muted file:me-3 file:min-h-10 file:rounded-lg file:border file:border-border file:bg-white file:px-3 file:font-semibold file:text-primary" />
-          <span className="mt-1 block text-xs font-normal text-muted">JPG أو PNG أو WebP، بحد أقصى 5MB. الأفضل صورة أفقية 800 × 600 بكسل.</span>
+          <WebpImageInput name="category_image" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} className="mt-1.5 block w-full text-xs text-muted file:me-3 file:min-h-10 file:rounded-lg file:border file:border-border file:bg-white file:px-3 file:font-semibold file:text-primary" maxDimension={1400} maxBytes={1_000_000} />
+          <span className="mt-1 block text-xs font-normal text-muted">JPG أو PNG أو WebP؛ تُضغط تلقائيًا إلى WebP. الأفضل صورة أفقية 800 × 600 بكسل.</span>
         </label>
         <div className="col-span-2 flex justify-end gap-2">
           <button type="button" onClick={(event) => { event.currentTarget.form?.reset(); setCreateOpen(false); }} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 text-sm font-semibold text-muted transition hover:bg-slate-50">إلغاء</button>
@@ -92,7 +93,7 @@ export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl
               </label>
               <span className="shrink-0 text-muted">{category.product_count} منتج</span>
             </div>
-            <input id={`category-image-${category.id}`} name="category_image" type="file" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} className="sr-only" aria-label={`صورة التصنيف ${category.name}`} />
+            <WebpImageInput id={`category-image-${category.id}`} name="category_image" accept={PRODUCT_IMAGE_MIME_TYPES.join(",")} className="sr-only" aria-label={`صورة التصنيف ${category.name}`} maxDimension={1400} maxBytes={1_000_000} />
             <div className="grid grid-cols-2 gap-1.5">
               <label htmlFor={`category-image-${category.id}`} className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-border px-1.5 text-[10px] font-semibold text-primary transition hover:bg-blue-50 sm:text-xs">{category.image_url ? "تغيير الصورة" : "إضافة صورة"}</label>
               {category.image_url ? <label className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-1 text-[10px] font-semibold text-rose-700 sm:text-xs"><input type="checkbox" name="remove_category_image" className="h-3.5 w-3.5 accent-rose-600" />حذف الصورة</label> : <span className="flex items-center justify-center text-[9px] text-muted">حتى 5MB</span>}
@@ -102,7 +103,7 @@ export function CategoryManager({ rows, allProductsImageUrl, customOrderImageUrl
           {category.product_count > 0 ? <div className="mt-2 border-t border-border pt-2">
             <WarningDialogButton title="لا يمكن حذف التصنيف" message={<>التصنيف مرتبط بـ <strong className="text-text">{category.product_count.toLocaleString("ar-YE-u-nu-latn")} منتج</strong>. أخفِ التصنيف بدلًا من حذفه.</>} className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</WarningDialogButton>
           </div> : <ActionForm action={deleteSimpleRow.bind(null, "categories", category.id)} successMessage="تم حذف التصنيف." className="mt-2 border-t border-border pt-2">
-            <ConfirmSubmit compact spinnerOnly pendingLabel="جارٍ حذف التصنيف" message="هل تريد حذف هذا التصنيف؟ لا يمكن التراجع عن العملية." className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</ConfirmSubmit>
+            <ConfirmSubmit compact pendingLabel="جارٍ حذف التصنيف" message="هل تريد حذف هذا التصنيف؟ لا يمكن التراجع عن العملية." className="min-h-8 w-full rounded-lg px-2 text-[10px] font-semibold text-rose-600 transition hover:bg-rose-50 sm:text-xs">حذف التصنيف</ConfirmSubmit>
           </ActionForm>}
         </article>)}
       </div> : <div className="rounded-2xl border border-dashed border-border bg-white px-5 py-12 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-muted"><CategoryIcon /></span><p className="mt-3 font-semibold">لا توجد تصنيفات بعد</p><p className="mt-1 text-sm text-muted">أضف أول تصنيف ليبدأ تنظيم منتجات المتجر.</p></div>}

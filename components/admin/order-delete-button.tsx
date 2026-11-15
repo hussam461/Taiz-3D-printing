@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteTerminalOrder } from "@/lib/admin/actions";
 
-type DeleteResult = { ok: boolean; error?: string } | null;
+type DeleteResult = { ok: boolean; error?: string; warning?: string } | null;
 
 export function OrderDeleteButton({ orderId, orderReference }: { orderId: string; orderReference: string }) {
   const [confirming, setConfirming] = useState(false);
@@ -46,7 +46,7 @@ function DeleteOrderDialog({ orderId, orderReference, onCancel, onClose }: { ord
     <OrderDeleteBackdrop dismissEnabled={result !== null} pending={pending} onDismiss={onDismiss}>
       <section role="alertdialog" aria-modal="true" aria-labelledby={`delete-order-title-${orderReference}`} className="max-h-[calc(100dvh-1.5rem)] w-[min(100%,26rem)] overflow-y-auto rounded-2xl border border-border bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-2.5rem)] sm:p-6">
         <h2 id={`delete-order-title-${orderReference}`} className="text-base font-bold text-text">{succeeded ? "اكتمل حذف الطلب" : "تأكيد حذف الطلب"}</h2>
-        {succeeded ? <p role="status" className="mt-3 rounded-xl border border-green-200 bg-green-50 p-3 text-sm leading-6 text-green-900">تم حذف الطلب {orderReference} وبياناته وإثباتات الدفع التابعة له.</p> : <>
+        {succeeded ? <div role="status" className="mt-3 space-y-2 rounded-xl border border-green-200 bg-green-50 p-3 text-sm leading-6 text-green-900"><p>تم حذف الطلب {orderReference} وبياناته وإثباتات الدفع التابعة له.</p>{result?.warning ? <p className="rounded-lg bg-amber-50 p-2 text-amber-900">{result.warning}</p> : <p>حُذفت صور المنتجات التي لم تعد مرتبطة بمنتج أو طلب آخر.</p>}</div> : <>
           <p className="mt-2 text-sm leading-6 text-muted">سيُحذف الطلب {orderReference} وبنوده وإثباتات الدفع وسجل حالته نهائيًا. لا يمكن التراجع عن الحذف.</p>
           {result && !result.ok ? <p role="alert" className="mt-3 break-words rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-5 text-red-800">{result.error ?? "تعذر حذف الطلب. حاول مرة أخرى."}</p> : null}
         </>}

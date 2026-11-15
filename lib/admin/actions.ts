@@ -1,7 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -11,6 +11,13 @@ import { PAYMENT_CURRENCIES } from "@/types/domain";
 import { hasValidProductImageSignature, parseProductForm, productImageExtension, validateProductImageMetadata } from "@/lib/validation/product";
 import { parseDeliveryFee } from "@/lib/validation/delivery-fee";
 import { whatsappNumber } from "@/lib/formatting/whatsapp";
+import { STOREFRONT_PUBLIC_CACHE_TAG } from "@/lib/queries/public-cache";
+
+const PUBLIC_MEDIA_CACHE_CONTROL = "31536000";
+
+function refreshPublicStorefrontData() {
+  updateTag(STOREFRONT_PUBLIC_CACHE_TAG);
+}
 
 async function isImageReferencedByHistoricalOrder(
   supabase: SupabaseClient,
@@ -29,6 +36,10 @@ async function isImageReferencedByHistoricalOrder(
     const snapshot = item.snapshot as { image?: unknown } | null;
     return snapshot?.image === storagePath;
   });
+}
+
+function isStorageObjectPath(path: unknown): path is string {
+  return typeof path === "string" && path.length > 0 && !path.startsWith("/") && !/^https?:\/\//i.test(path) && !path.includes("..");
 }
 
 export async function loginAdmin(formData: FormData) {
@@ -126,6 +137,19 @@ export async function deleteTerminalOrder(orderId: string) {
     return { ok: false as const, error: "يمكن حذف الطلبات المكتملة أو الملغاة فقط." };
   }
 
+  const { data: orderItems, error: itemsError } = await supabase
+    .from("order_items")
+    .select("snapshot")
+    .eq("order_id", orderId);
+  if (itemsError || !orderItems) {
+    console.error("Order items could not be loaded before deletion", { orderId, error: itemsError });
+    return { ok: false as const, error: "تعذر التحقق من صور منتجات الطلب؛ لم يُحذف الطلب." };
+  }
+  const historicalImagePaths = [...new Set(orderItems.flatMap((item) => {
+    const snapshot = item.snapshot as { image?: unknown } | null;
+    return isStorageObjectPath(snapshot?.image) ? [snapshot.image] : [];
+  }))];
+
   const { data: proofs, error: proofsError } = await supabase
     .from("payment_proofs")
     .select("storage_path")
@@ -156,9 +180,32 @@ export async function deleteTerminalOrder(orderId: string) {
     return { ok: false as const, error: "تعذر حذف سجل الطلب بعد تنظيف ملفات الإثبات. حدّث الصفحة وحاول مجددًا." };
   }
 
+  let imageCleanupFailed = false;
+  for (const path of historicalImagePaths) {
+    const [{ data: productImage, error: productImageError }, { data: otherOrderItem, error: otherOrderItemError }] = await Promise.all([
+      supabase.from("product_images").select("id").eq("storage_path", path).limit(1).maybeSingle(),
+      supabase.from("order_items").select("id").contains("snapshot", { image: path }).limit(1).maybeSingle(),
+    ]);
+    if (productImageError || otherOrderItemError) {
+      imageCleanupFailed = true;
+      console.error("Historical product image references could not be checked", { orderId, path, productImageError, otherOrderItemError });
+      continue;
+    }
+    if (productImage || otherOrderItem) continue;
+
+    const { error: imageDeleteError } = await supabase.storage.from("product-images").remove([path]);
+    if (imageDeleteError) {
+      imageCleanupFailed = true;
+      console.error("Unreferenced historical product image could not be removed", { orderId, path, error: imageDeleteError });
+    }
+  }
+
   revalidatePath("/admin/orders");
   revalidatePath("/admin");
-  return { ok: true as const };
+  return {
+    ok: true as const,
+    warning: imageCleanupFailed ? "حُذف الطلب، لكن تعذر حذف بعض صور المنتجات القديمة. راجع سجل الخادم." : undefined,
+  };
 }
 
 export async function completeOrderDelivery(orderId: string) {
@@ -455,6 +502,7 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/admin/products");
   revalidatePath("/products");
+  refreshPublicStorefrontData();
   return { ok: true, productId, created };
   } catch (error) {
     const digest = (error as { digest?: string } | null)?.digest;
@@ -469,6 +517,7 @@ export async function deactivateProduct(id: string) {
   const supabase = await createServerSupabase();
   await supabase.from("products").update({ is_active: false }).eq("id", id);
   revalidatePath("/admin/products");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -484,6 +533,7 @@ export async function toggleProductPublication(id: string, currentlyActive: bool
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
   revalidatePath("/products");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -544,6 +594,7 @@ export async function deleteProduct(id: string) {
   }
   if (removablePaths.length > 0) await supabase.storage.from("product-images").remove(removablePaths);
   revalidatePath("/products");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -689,6 +740,7 @@ export async function saveSimpleRow(table: string, formData: FormData) {
     revalidatePath("/products/[slug]", "page");
   }
   if (table === "homepage_benefits") revalidatePath("/");
+  refreshPublicStorefrontData();
   return { ok: true as const, id: savedId ?? undefined };
 }
 
@@ -732,7 +784,7 @@ export async function saveCategory(formData: FormData) {
     const bytes = new Uint8Array(await image.arrayBuffer());
     if (!hasValidProductImageSignature(image.type, bytes)) return { ok: false as const, error: "محتوى الملف لا يطابق صورة صالحة. اختر JPG أو PNG أو WebP." };
     uploadedPath = `categories/${crypto.randomUUID()}.${productImageExtension(image.type)}`;
-    const { error } = await supabase.storage.from("store-assets").upload(uploadedPath, Buffer.from(bytes), { contentType: image.type, upsert: false });
+    const { error } = await supabase.storage.from("store-assets").upload(uploadedPath, Buffer.from(bytes), { contentType: image.type, cacheControl: PUBLIC_MEDIA_CACHE_CONTROL, upsert: false });
     if (error) {
       console.error("Category image upload failed", { error });
       return { ok: false as const, error: "تعذر رفع الصورة. تحقق من الاتصال وحاول مرة أخرى." };
@@ -764,6 +816,7 @@ export async function saveCategory(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath("/admin/categories");
+  refreshPublicStorefrontData();
   return { ok: true as const, id: saved.id };
 }
 
@@ -808,6 +861,7 @@ export async function deleteSimpleRow(table: string, id: string) {
   revalidatePath("/admin");
   revalidatePath(`/admin/${table === "delivery_areas" ? "delivery" : table === "payment_accounts" ? "payment-accounts" : table === "faq_items" ? "faq" : table === "homepage_benefits" ? "homepage-benefits" : table === "legal_pages" ? "legal-pages" : table}`);
   if (table === "homepage_benefits") revalidatePath("/");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -856,7 +910,7 @@ export async function saveStoreSettings(formData: FormData) {
       return { ok: false as const, error: "محتوى الملف لا يطابق صورة صالحة. اختر JPG أو PNG أو WebP." };
     }
     uploadedLogoPath = `logo/${crypto.randomUUID()}.${productImageExtension(logoFile.type)}`;
-    const { error: uploadError } = await supabase.storage.from("store-assets").upload(uploadedLogoPath, Buffer.from(logoBytes), { contentType: logoFile.type, upsert: false });
+    const { error: uploadError } = await supabase.storage.from("store-assets").upload(uploadedLogoPath, Buffer.from(logoBytes), { contentType: logoFile.type, cacheControl: PUBLIC_MEDIA_CACHE_CONTROL, upsert: false });
     if (uploadError) {
       console.error("Store logo upload failed", { error: uploadError });
       return { ok: false as const, error: "تعذر رفع الشعار. تحقق من الاتصال وحاول مرة أخرى." };
@@ -888,7 +942,7 @@ export async function saveStoreSettings(formData: FormData) {
       return { ok: false as const, error: "محتوى الملف لا يطابق صورة صالحة. اختر JPG أو PNG أو WebP." };
     }
     const path = `${field.prefix}/${crypto.randomUUID()}.${productImageExtension(file.type)}`;
-    const { error: uploadError } = await supabase.storage.from("store-assets").upload(path, Buffer.from(bytes), { contentType: file.type, upsert: false });
+    const { error: uploadError } = await supabase.storage.from("store-assets").upload(path, Buffer.from(bytes), { contentType: file.type, cacheControl: PUBLIC_MEDIA_CACHE_CONTROL, upsert: false });
     if (uploadError) {
       console.error("Storefront card image upload failed", { field: field.pathKey, error: uploadError });
       await cleanupPendingImageUploads();
@@ -952,6 +1006,7 @@ export async function saveStoreSettings(formData: FormData) {
   revalidatePath("/", "layout");
   revalidatePath("/admin/settings");
   revalidatePath("/admin/store-information");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -1005,6 +1060,7 @@ export async function saveCustomOrderContent(formData: FormData) {
   }
   revalidatePath("/custom-order");
   revalidatePath("/admin/custom-order");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -1041,7 +1097,7 @@ export async function saveHomepageSlide(formData: FormData) {
       return { ok: false as const, error: "محتوى الملف لا يطابق صورة صالحة. اختر JPG أو PNG أو WebP." };
     }
     uploadedPath = `homepage/${crypto.randomUUID()}.${productImageExtension(imageFile.type)}`;
-    const { error: uploadError } = await supabase.storage.from("store-assets").upload(uploadedPath, Buffer.from(bytes), { contentType: imageFile.type, upsert: false });
+    const { error: uploadError } = await supabase.storage.from("store-assets").upload(uploadedPath, Buffer.from(bytes), { contentType: imageFile.type, cacheControl: PUBLIC_MEDIA_CACHE_CONTROL, upsert: false });
     if (uploadError) {
       console.error("Homepage slide image upload failed", { error: uploadError });
       return { ok: false as const, error: "تعذر رفع صورة الشريحة. تحقق من الاتصال وحاول مرة أخرى." };
@@ -1077,6 +1133,7 @@ export async function saveHomepageSlide(formData: FormData) {
   }
   revalidatePath("/");
   revalidatePath("/admin/homepage-slides");
+  refreshPublicStorefrontData();
   return { ok: true as const, id: saved.id };
 }
 
@@ -1095,6 +1152,7 @@ export async function reorderHomepageSlides(formData: FormData) {
   }
   revalidatePath("/");
   revalidatePath("/admin/homepage-slides");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -1117,6 +1175,7 @@ export async function deleteHomepageSlide(id: string) {
   }
   revalidatePath("/");
   revalidatePath("/admin/homepage-slides");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -1134,6 +1193,7 @@ export async function saveContactSettings(formData: FormData) {
   if (error) return { ok: false as const, error: "تعذر حفظ معلومات التواصل" };
   revalidatePath("/");
   revalidatePath("/admin/contact-information");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -1148,5 +1208,6 @@ export async function saveLegalPage(formData: FormData) {
   });
   if (error) return { ok: false as const, error: "تعذر حفظ الصفحة القانونية" };
   revalidatePath("/admin/legal-pages");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }

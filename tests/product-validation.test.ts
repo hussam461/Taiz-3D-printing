@@ -9,7 +9,7 @@ function validForm(overrides: Record<string, string> = {}) {
   const form = new FormData();
   form.set("name", "حامل أقلام");
   form.set("description", "وصف واضح للمنتج");
-  form.set("category_id", "576277f0-4e57-4b4e-b0d5-01d06733c107");
+  form.set("category_ids", "576277f0-4e57-4b4e-b0d5-01d06733c107");
   form.set("base_price_old_yer", "12000");
   form.set("discount_percent", "");
   form.set("is_active", "on");
@@ -38,7 +38,8 @@ describe("product validation", () => {
     ["name", "", "name"],
     ["name", "A", "name"],
     ["description", "   ", "description"],
-    ["category_id", "", "category_id"],
+    ["category_ids", "", "category_ids"],
+    ["category_ids", "not-a-uuid", "category_ids"],
     ["base_price_old_yer", "", "base_price_old_yer"],
     ["base_price_old_yer", "-1", "base_price_old_yer"],
     ["base_price_old_yer", "1.5", "base_price_old_yer"],

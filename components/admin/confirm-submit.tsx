@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-export function ConfirmSubmit({ children, message, className, compact = false, confirmPrompt, confirmLabel = "تأكيد", pendingLabel = "جارٍ التنفيذ...", name, value, spinnerOnly = false }: { children: React.ReactNode; message: string; className?: string; compact?: boolean; confirmPrompt?: string; confirmLabel?: string; pendingLabel?: string; name?: string; value?: string; spinnerOnly?: boolean }) {
+export function ConfirmSubmit({ children, message, className, compact = false, confirmPrompt, confirmLabel = "تأكيد", pendingLabel = "جارٍ التنفيذ...", name, value }: { children: React.ReactNode; message: string; className?: string; compact?: boolean; confirmPrompt?: string; confirmLabel?: string; pendingLabel?: string; name?: string; value?: string }) {
   const [confirming, setConfirming] = useState(false);
   const { pending } = useFormStatus();
   const titleId = useId();

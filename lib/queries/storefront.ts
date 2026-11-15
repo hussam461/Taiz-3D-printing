@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { publicMediaUrl } from "@/lib/storage/public-url";
+import { cachePublicQuery } from "@/lib/queries/public-cache";
 
 export type Category = {
   id: string;
@@ -77,45 +78,51 @@ async function db() {
   return createServerSupabase();
 }
 
-export async function getPublishedHomepageSlides(): Promise<HomepageSlide[]> {
-  const supabase = await db();
-  if (!supabase) return [];
+const getCachedPublishedHomepageSlides = cachePublicQuery("homepage-slides", async (supabase) => {
   const { data, error } = await supabase
     .from("homepage_slides")
     .select("id, image_path, title, description, href")
     .eq("is_published", true)
     .order("sort_order", { ascending: true })
     .limit(8);
-  if (error) {
-    console.error("Published homepage slides could not be loaded", { error });
-    return [];
-  }
+  if (error) throw error;
   return (data ?? []).filter((slide) => Boolean(slide.image_path)) as HomepageSlide[];
+});
+
+export async function getPublishedHomepageSlides(): Promise<HomepageSlide[]> {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedPublishedHomepageSlides(); }
+  catch (error) { console.error("Published homepage slides could not be loaded", { error }); return []; }
 }
 
-export async function getPublishedHomepageBenefits(): Promise<HomepageBenefit[]> {
-  const supabase = await db();
-  if (!supabase) return [];
+const getCachedPublishedHomepageBenefits = cachePublicQuery("homepage-benefits", async (supabase) => {
   const { data, error } = await supabase
     .from("homepage_benefits")
     .select("id, title, description")
     .eq("is_published", true)
     .order("sort_order", { ascending: true });
-  if (error) {
-    console.error("Published homepage benefits could not be loaded", { error });
-    return [];
-  }
+  if (error) throw error;
   return (data ?? []) as HomepageBenefit[];
+});
+
+export async function getPublishedHomepageBenefits(): Promise<HomepageBenefit[]> {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedPublishedHomepageBenefits(); }
+  catch (error) { console.error("Published homepage benefits could not be loaded", { error }); return []; }
 }
 
-export async function getCustomOrderContent(): Promise<CustomOrderContent> {
-  const supabase = await db();
-  if (!supabase) return DEFAULT_CUSTOM_ORDER_CONTENT;
+const getCachedCustomOrderContent = cachePublicQuery("custom-order-content", async (supabase) => {
   const { data, error } = await supabase.from("custom_order_content").select("*").eq("id", 1).maybeSingle();
-  if (error || !data) {
-    if (error) console.error("Custom order content could not be loaded", { error });
-    return DEFAULT_CUSTOM_ORDER_CONTENT;
-  }
+  if (error) throw error;
+  return data;
+});
+
+export async function getCustomOrderContent(): Promise<CustomOrderContent> {
+  if (!isSupabaseConfigured()) return DEFAULT_CUSTOM_ORDER_CONTENT;
+  let data;
+  try { data = await getCachedCustomOrderContent(); }
+  catch (error) { console.error("Custom order content could not be loaded", { error }); return DEFAULT_CUSTOM_ORDER_CONTENT; }
+  if (!data) return DEFAULT_CUSTOM_ORDER_CONTENT;
   const rawSteps: unknown = data.steps;
   const rawMaterials: unknown = data.materials;
   const steps = Array.isArray(rawSteps) ? rawSteps.filter((step: unknown): step is { title: string; description: string } => Boolean(step && typeof step === "object" && "title" in step && typeof step.title === "string" && "description" in step && typeof step.description === "string")) : [];
@@ -128,36 +135,7 @@ export async function getCustomOrderContent(): Promise<CustomOrderContent> {
   } as CustomOrderContent;
 }
 
-export async function getStorefrontContext() {
-  const supabase = await db();
-  if (!supabase) {
-    return {
-      store: {
-        store_name: "Taiz 3D Printing",
-        description: "منصة يمنية للطباعة ثلاثية الأبعاد.",
-        hero_headline: "طباعة ثلاثية الأبعاد بمعايير تصنيع واضحة",
-        hero_description:
-          "منتجات جاهزة وطلبات مخصّصة، بأسعار بالريال اليمني القديم.",
-        logo_path: null as string | null,
-         all_products_image_path: null as string | null,
-         custom_order_image_path: null as string | null,
-        announcement_enabled: true,
-        announcement_text: "عروض جديدة ومنتجات مميزة بانتظارك",
-        announcement_button_label: "تسوق الآن",
-        announcement_href: "/products",
-        announcement_scope: "all",
-        announcement_button_enabled: true,
-        deposit_percent: 30,
-      },
-      contact: {
-        phone: null as string | null,
-        whatsapp: null as string | null,
-        instagram: null as string | null,
-        email: null as string | null,
-      },
-      configured: false,
-    };
-  }
+const getCachedStorefrontContext = cachePublicQuery("storefront-context", async (supabase) => {
   const [{ data: store }, { data: contact }] = await Promise.all([
     supabase.from("store_settings").select("*").eq("id", 1).maybeSingle(),
     supabase.from("contact_settings").select("*").eq("id", 1).maybeSingle(),
@@ -183,11 +161,35 @@ export async function getStorefrontContext() {
     contact: contact ?? { phone: null, whatsapp: null, instagram: null, email: null },
     configured: true,
   };
+});
+
+export async function getStorefrontContext() {
+  if (!isSupabaseConfigured()) {
+    return {
+      store: {
+        store_name: "Taiz 3D Printing",
+        description: "منصة يمنية للطباعة ثلاثية الأبعاد.",
+        hero_headline: "طباعة ثلاثية الأبعاد بمعايير تصنيع واضحة",
+        hero_description: "منتجات جاهزة وطلبات مخصّصة، بأسعار بالريال اليمني القديم.",
+        logo_path: null as string | null,
+        all_products_image_path: null as string | null,
+        custom_order_image_path: null as string | null,
+        announcement_enabled: true,
+        announcement_text: "عروض جديدة ومنتجات مميزة بانتظارك",
+        announcement_button_label: "تسوق الآن",
+        announcement_href: "/products",
+        announcement_scope: "all",
+        announcement_button_enabled: true,
+        deposit_percent: 30,
+      },
+      contact: { phone: null as string | null, whatsapp: null as string | null, instagram: null as string | null, email: null as string | null },
+      configured: false,
+    };
+  }
+  return getCachedStorefrontContext();
 }
 
-export async function getActiveCategories(): Promise<Category[]> {
-  const supabase = await db();
-  if (!supabase) return [];
+const getCachedActiveCategories = cachePublicQuery("active-categories", async (supabase) => {
   const { data, error } = await supabase
     .from("categories")
     .select("id, name, slug, description, image_path")
@@ -195,16 +197,20 @@ export async function getActiveCategories(): Promise<Category[]> {
     .order("sort_order");
   if (error?.code === "PGRST204" || error?.code === "42703") {
     const legacy = await supabase.from("categories").select("id, name, slug, description").eq("is_active", true).order("sort_order");
+    if (legacy.error) throw legacy.error;
     return legacy.data ?? [];
   }
-  if (error) {
-    console.error("Active categories could not be loaded", { error });
-    return [];
-  }
+  if (error) throw error;
   return (data ?? []).map((category) => ({
     ...category,
     image_url: publicMediaUrl(category.image_path, "store-assets"),
   }));
+});
+
+export async function getActiveCategories(): Promise<Category[]> {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedActiveCategories(); }
+  catch (error) { console.error("Active categories could not be loaded", { error }); return []; }
 }
 
 function mapProducts(
@@ -240,9 +246,7 @@ function mapProducts(
   });
 }
 
-export async function getFeaturedProducts(): Promise<ProductCard[]> {
-  const supabase = await db();
-  if (!supabase) return [];
+const getCachedFeaturedProducts = cachePublicQuery("featured-products", async (supabase) => {
   const { data, error } = await supabase
     .from("products")
     .select(
@@ -252,16 +256,17 @@ export async function getFeaturedProducts(): Promise<ProductCard[]> {
     .eq("is_featured", true)
     .order("created_at", { ascending: false })
     .limit(8);
-  if (error) {
-    console.error("Featured products could not be loaded", { error });
-    return [];
-  }
+  if (error) throw error;
   return mapProducts(data ?? []);
+});
+
+export async function getFeaturedProducts(): Promise<ProductCard[]> {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedFeaturedProducts(); }
+  catch (error) { console.error("Featured products could not be loaded", { error }); return []; }
 }
 
-export async function getLatestProducts(): Promise<ProductCard[]> {
-  const supabase = await db();
-  if (!supabase) return [];
+const getCachedLatestProducts = cachePublicQuery("latest-products", async (supabase) => {
   const { data, error } = await supabase
     .from("products")
     .select(
@@ -270,16 +275,18 @@ export async function getLatestProducts(): Promise<ProductCard[]> {
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(8);
-  if (error) {
-    console.error("Latest products could not be loaded", { error });
-    return [];
-  }
+  if (error) throw error;
   return mapProducts(data ?? []);
+});
+
+export async function getLatestProducts(): Promise<ProductCard[]> {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedLatestProducts(); }
+  catch (error) { console.error("Latest products could not be loaded", { error }); return []; }
 }
 
-export async function getRelatedProducts(categorySlug: string, excludeProductId: string): Promise<ProductCard[]> {
-  const supabase = await db();
-  if (!supabase || !categorySlug) return [];
+const getCachedRelatedProducts = cachePublicQuery("related-products", async (supabase, categorySlug: string, excludeProductId: string) => {
+  if (!categorySlug) return [] as ProductCard[];
   const { data, error } = await supabase
     .from("products")
     .select("id, name, slug, description, base_price_old_yer, discount_percent, is_featured, created_at, categories!products_category_id_fkey!inner(id, name, slug), product_images(storage_path, is_main)")
@@ -288,8 +295,14 @@ export async function getRelatedProducts(categorySlug: string, excludeProductId:
     .neq("id", excludeProductId)
     .order("created_at", { ascending: false })
     .limit(8);
-  if (error) console.error("Related products could not be loaded", { categorySlug, error });
+  if (error) throw error;
   return mapProducts(data ?? []);
+});
+
+export async function getRelatedProducts(categorySlug: string, excludeProductId: string): Promise<ProductCard[]> {
+  if (!isSupabaseConfigured() || !categorySlug) return [];
+  try { return await getCachedRelatedProducts(categorySlug, excludeProductId); }
+  catch (error) { console.error("Related products could not be loaded", { categorySlug, error }); return []; }
 }
 
 export const PRODUCTS_PAGE_SIZE = 15;
@@ -305,9 +318,7 @@ export type ProductListQuery = {
   page?: number;
 };
 
-export async function searchProducts(query: ProductListQuery) {
-  const supabase = await db();
-  if (!supabase) return { items: [] as ProductCard[], total: 0, page: 1, pageSize: PRODUCTS_PAGE_SIZE };
+const getCachedSearchProducts = cachePublicQuery("product-search", async (supabase, query: ProductListQuery) => {
   const page = Math.max(1, query.page ?? 1);
   const pageSize = PRODUCTS_PAGE_SIZE;
   const from = (page - 1) * pageSize;
@@ -324,7 +335,7 @@ export async function searchProducts(query: ProductListQuery) {
       .maybeSingle();
     if (categoryError) {
       console.error("Active category lookup failed", { slug: query.category, error: categoryError });
-      return { items: [] as ProductCard[], total: 0, page, pageSize };
+      throw categoryError;
     }
     if (!category) return { items: [] as ProductCard[], total: 0, page, pageSize };
     selectedCategoryId = category.id;
@@ -353,22 +364,25 @@ export async function searchProducts(query: ProductListQuery) {
 
   if (term) {
     const { data: matchedCategoryProducts, error: categoryError } = await supabase.rpc("storefront_product_ids_by_category_name", { p_term: term });
-    if (categoryError) console.error("Product search category lookup failed", { error: categoryError });
+    if (categoryError) {
+      console.error("Product search category lookup failed", { error: categoryError });
+      throw categoryError;
+    }
     const categoryProductIds = [...new Set(((matchedCategoryProducts ?? []) as { product_id: string }[]).map((row) => row.product_id))];
     const productFilter = `name.ilike.%${term}%,description.ilike.%${term}%`;
     const nameRequest = buildRequest().or(productFilter).range(0, to);
     if (!categoryProductIds.length) {
       const { data, count, error } = await nameRequest;
-      if (error) console.error("Product search failed", { error });
+      if (error) throw error;
       return { items: mapProducts(data ?? []), total: count ?? 0, page, pageSize };
     }
 
     const categoryRequest = buildRequest().in("id", categoryProductIds).range(0, to);
     const overlapRequest = buildRequest().in("id", categoryProductIds).or(productFilter).range(0, 0);
     const [nameResult, categoryResult, overlapResult] = await Promise.all([nameRequest, categoryRequest, overlapRequest]);
-    if (nameResult.error) console.error("Product name search failed", { error: nameResult.error });
-    if (categoryResult.error) console.error("Product category search failed", { error: categoryResult.error });
-    if (overlapResult.error) console.error("Product search count failed", { error: overlapResult.error });
+    if (nameResult.error) throw nameResult.error;
+    if (categoryResult.error) throw categoryResult.error;
+    if (overlapResult.error) throw overlapResult.error;
 
     const rowsById = new Map<string, NonNullable<typeof nameResult.data>[number]>();
     for (const row of [...(nameResult.data ?? []), ...(categoryResult.data ?? [])]) rowsById.set(row.id, row);
@@ -381,13 +395,22 @@ export async function searchProducts(query: ProductListQuery) {
   }
 
   const { data, count, error } = await buildRequest().range(from, to);
-  if (error) console.error("Product list query failed", { error });
+  if (error) throw error;
   return { items: mapProducts(data ?? []), total: count ?? 0, page, pageSize };
+});
+
+export async function searchProducts(query: ProductListQuery) {
+  const page = Math.max(1, query.page ?? 1);
+  if (!isSupabaseConfigured()) return { items: [] as ProductCard[], total: 0, page: 1, pageSize: PRODUCTS_PAGE_SIZE };
+  try {
+    return await getCachedSearchProducts(query);
+  } catch (error) {
+    console.error("Product list query failed", { error });
+    return { items: [] as ProductCard[], total: 0, page, pageSize: PRODUCTS_PAGE_SIZE };
+  }
 }
 
-export const getProductBySlug = cache(async (slug: string) => {
-  const supabase = await db();
-  if (!supabase) return null;
+const getCachedProductBySlug = cachePublicQuery("product-by-slug", async (supabase, slug: string) => {
   const { data, error } = await supabase
     .from("products")
     .select(
@@ -396,22 +419,38 @@ export const getProductBySlug = cache(async (slug: string) => {
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
-  if (error) console.error("Product details could not be loaded", { slug, error });
+  if (error) throw error;
   return data;
 });
 
-export async function getColors() {
-  const supabase = await db();
-  if (!supabase) return [];
-  const { data } = await supabase.from("colors").select("*").eq("is_active", true).order("sort_order");
+export const getProductBySlug = cache(async (slug: string) => {
+  if (!isSupabaseConfigured()) return null;
+  try { return await getCachedProductBySlug(slug); }
+  catch (error) { console.error("Product details could not be loaded", { slug, error }); return null; }
+});
+
+const getCachedColors = cachePublicQuery("colors", async (supabase) => {
+  const { data, error } = await supabase.from("colors").select("*").eq("is_active", true).order("sort_order");
+  if (error) throw error;
   return data ?? [];
+});
+
+export async function getColors() {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedColors(); }
+  catch (error) { console.error("Active colors could not be loaded", { error }); return []; }
 }
 
-export async function getMaterials() {
-  const supabase = await db();
-  if (!supabase) return [];
-  const { data } = await supabase.from("materials").select("*").eq("is_active", true).order("sort_order");
+const getCachedMaterials = cachePublicQuery("materials", async (supabase) => {
+  const { data, error } = await supabase.from("materials").select("*").eq("is_active", true).order("sort_order");
+  if (error) throw error;
   return data ?? [];
+});
+
+export async function getMaterials() {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedMaterials(); }
+  catch (error) { console.error("Active materials could not be loaded", { error }); return []; }
 }
 
 export async function getDeliveryAreas() {
@@ -449,22 +488,32 @@ export async function getCheckoutConfig() {
   };
 }
 
-export async function getFaq() {
-  const supabase = await db();
-  if (!supabase) return [];
-  const { data } = await supabase
+const getCachedFaq = cachePublicQuery("faq", async (supabase) => {
+  const { data, error } = await supabase
     .from("faq_items")
     .select("*")
     .eq("is_published", true)
     .order("sort_order");
+  if (error) throw error;
   return data ?? [];
+});
+
+export async function getFaq() {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedFaq(); }
+  catch (error) { console.error("Published FAQ could not be loaded", { error }); return []; }
 }
 
-export async function getLegalPage(slug: string) {
-  const supabase = await db();
-  if (!supabase) return null;
-  const { data } = await supabase.from("legal_pages").select("*").eq("slug", slug).maybeSingle();
+const getCachedLegalPage = cachePublicQuery("legal-page", async (supabase, slug: string) => {
+  const { data, error } = await supabase.from("legal_pages").select("*").eq("slug", slug).maybeSingle();
+  if (error) throw error;
   return data;
+});
+
+export async function getLegalPage(slug: string) {
+  if (!isSupabaseConfigured()) return null;
+  try { return await getCachedLegalPage(slug); }
+  catch (error) { console.error("Legal page could not be loaded", { slug, error }); return null; }
 }
 
 export async function getSearchSuggestions(q: string) {

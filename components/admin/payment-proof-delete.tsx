@@ -7,8 +7,6 @@ import { SubmitButton } from "@/components/admin/action-form";
 import { usePaymentProofSelection } from "@/components/admin/payment-proof-selection";
 import { deletePaymentProof } from "@/lib/admin/actions";
 
-type DeleteResult = { ok: boolean; error?: string } | null;
-
 export function PaymentProofDelete({ proofId }: { proofId: string }) {
   const [confirming, setConfirming] = useState(false);
   const selection = usePaymentProofSelection();
@@ -35,7 +33,7 @@ export function PaymentProofDelete({ proofId }: { proofId: string }) {
 }
 
 function DeleteProofDialog({ proofId, onCancel, onClose }: { proofId: string; onCancel: () => void; onClose: () => void }) {
-  const [result, formAction] = useActionState(async (_previous: DeleteResult, _formData: FormData) => deletePaymentProof(proofId), null);
+  const [result, formAction] = useActionState(async () => deletePaymentProof(proofId), null);
   const succeeded = result?.ok === true;
 
   return <form action={formAction} className="contents">
