@@ -16,6 +16,7 @@ export default async function ProductsPage({
   }>;
 }) {
   const params = await searchParams;
+  const sectionLabel = params.featured === "1" ? "مميزة" : null;
   const queryText = params.storefrontSearch ?? params.q;
   const filterParams = { ...params, q: queryText };
   const sort = (params.sort as "newest" | "price_asc" | "price_desc" | "relevance") ?? undefined;
@@ -48,7 +49,7 @@ export default async function ProductsPage({
       <nav aria-label="مسار الصفحة" className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <Link href="/" className="transition hover:text-primary">الرئيسية</Link>
         <span aria-hidden="true">›</span>
-        {selectedCategory ? <><Link href="/products" className="transition hover:text-primary">جميع المنتجات</Link><span aria-hidden="true">›</span><span aria-current="page" className="font-medium text-text">{selectedCategory.name}</span></> : <span aria-current="page" className="font-medium text-text">جميع المنتجات</span>}
+        {selectedCategory ? <><Link href="/products" className="transition hover:text-primary">جميع المنتجات</Link><span aria-hidden="true">›</span><span aria-current="page" className="font-medium text-text">{selectedCategory.name}</span></> : sectionLabel ? <><Link href="/products" className="transition hover:text-primary">جميع المنتجات</Link><span aria-hidden="true">›</span><span aria-current="page" className="font-medium text-text">{sectionLabel}</span></> : <span aria-current="page" className="font-medium text-text">جميع المنتجات</span>}
       </nav>
       <ProductFilters params={filterParams} />
       {result.items.length === 0 ? (

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 const CART_ORIGIN_KEY = "storefront-cart-origin";
 const labels: Record<string, string> = {
-  "/products": "المنتجات",
+  "/products": "جميع المنتجات",
   "/cart": "السلة",
   "/checkout": "إتمام الطلب",
   "/checkout/success": "تم استلام طلبك",

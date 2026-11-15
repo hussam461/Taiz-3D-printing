@@ -86,7 +86,7 @@ export default async function ProductPage({
         </div>
         {product.description ? <section aria-labelledby="product-description-heading" className="space-y-2 border-t border-border pt-4">
           <h2 id="product-description-heading" className="text-base font-semibold">وصف المنتج</h2>
-          <div className="whitespace-pre-wrap leading-7 text-muted [&_p]:my-2 [&_strong]:font-bold [&_b]:font-bold [&_em]:italic [&_i]:italic [&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6" dangerouslySetInnerHTML={{ __html: sanitizeProductDescriptionMarkup(product.description) }} />
+          <div className="whitespace-pre-wrap leading-7 text-text [&_p]:my-2 [&_strong]:font-bold [&_b]:font-bold [&_em]:italic [&_i]:italic [&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6" dangerouslySetInnerHTML={{ __html: sanitizeProductDescriptionMarkup(product.description) }} />
         </section> : null}
         {specs.length > 0 ? (
           <section aria-labelledby="product-specifications-heading" className="space-y-2 border-t border-border pt-4">

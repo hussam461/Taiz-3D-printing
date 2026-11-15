@@ -22,10 +22,11 @@ export function QuantityStepper({
   }
 
   function handleInput(value: string) {
-    if (!/^\d*$/.test(value) || value.length > String(MAX_CART_QUANTITY).length) return;
-    if (value && Number(value) > MAX_CART_QUANTITY) return;
-    setDraftValue(value);
-    const parsed = Number(value);
+    const westernValue = toWesternDigits(value);
+    if (!/^\d*$/.test(westernValue) || westernValue.length > String(MAX_CART_QUANTITY).length) return;
+    if (westernValue && Number(westernValue) > MAX_CART_QUANTITY) return;
+    setDraftValue(westernValue);
+    const parsed = Number(westernValue);
     if (parsed > 0) onChange(parsed);
   }
 
@@ -36,8 +37,15 @@ export function QuantityStepper({
   return (
     <div role="group" aria-label="الكمية" className={`flex h-10 items-center overflow-hidden rounded-lg border border-border bg-white ${className}`}>
       <button type="button" aria-label="تقليل الكمية" disabled={quantity <= 1} onClick={() => update(quantity - 1)} className="inline-flex h-full w-10 shrink-0 items-center justify-center text-lg text-muted transition-colors hover:bg-slate-50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40">−</button>
-      <input type="number" inputMode="numeric" min={1} max={MAX_CART_QUANTITY} step={1} aria-label="الكمية" value={inputValue} onChange={(event) => handleInput(event.target.value)} onBlur={normalizeInput} className="h-full min-w-0 flex-1 appearance-none border-x border-border bg-transparent text-center text-sm font-semibold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+      <input type="text" inputMode="numeric" pattern="[0-9]*" dir="ltr" lang="en" aria-label="الكمية" value={inputValue} onChange={(event) => handleInput(event.target.value)} onBlur={normalizeInput} className="h-full min-w-0 flex-1 border-x border-border bg-transparent text-center text-sm font-semibold tabular-nums outline-none" />
       <button type="button" aria-label="زيادة الكمية" disabled={quantity >= MAX_CART_QUANTITY} onClick={() => update(quantity + 1)} className="inline-flex h-full w-10 shrink-0 items-center justify-center text-lg text-muted transition-colors hover:bg-slate-50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40">+</button>
     </div>
   );
+}
+
+function toWesternDigits(value: string) {
+  return value.replace(/[٠-٩۰-۹]/g, (digit) => {
+    const code = digit.charCodeAt(0);
+    return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
+  });
 }

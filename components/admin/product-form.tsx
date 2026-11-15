@@ -53,7 +53,7 @@ function CategoryMultiSelect({
   categories: { id: string; name: string }[];
   defaultValue: string[];
   invalid: boolean;
-  describedBy: string;
+  describedBy?: string;
   onChange: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState(defaultValue);
@@ -88,7 +88,7 @@ function CategoryMultiSelect({
     onChange();
   }
 
-  return <div ref={containerRef} className="relative">
+  return <div ref={containerRef} className="relative min-w-0 max-w-full">
     {selectedIds.map((categoryId) => <input key={categoryId} type="hidden" name="category_ids" value={categoryId} />)}
     <button
       ref={triggerRef}
@@ -100,7 +100,7 @@ function CategoryMultiSelect({
       aria-invalid={invalid}
       aria-describedby={describedBy}
       onClick={() => setOpen((value) => !value)}
-      className={`${inputClass} flex items-center justify-between gap-3 text-start ${invalid ? "border-red-500" : ""}`}
+      className={`${inputClass} flex min-w-0 max-w-full items-center justify-between gap-3 overflow-hidden text-start ${invalid ? "border-red-500" : ""}`}
     >
       <span className={`min-w-0 truncate ${selectedNames.length ? "text-text" : "text-slate-400"}`}>
         {selectedNames.length ? selectedNames.join("، ") : "اختر تصنيفًا أو أكثر"}
@@ -180,7 +180,7 @@ function Field({
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   return (
-    <div className={`grid content-start gap-2 ${className}`}>
+    <div className={`grid min-w-0 content-start gap-2 ${className}`}>
       <label htmlFor={id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
         <span>{label}{required ? <span className="ms-1 text-error" aria-hidden="true">*</span> : null}</span>
         {optional ? <span className="text-xs font-normal text-muted">اختياري</span> : null}
@@ -530,12 +530,12 @@ export function ProductForm({
           <Field id="name" label="اسم المنتج" required error={fieldErrors.name}>
             <input id="name" name="name" defaultValue={product?.name ?? ""} required minLength={2} maxLength={120} autoComplete="off" aria-required="true" aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? "name-error" : "name-hint"} placeholder="مثال: حامل أقلام مكتبي" className={inputClass} onChange={() => clearFieldError("name")} />
           </Field>
-          <Field id="category_ids" label="التصنيفات" required error={fieldErrors.category_ids} hint="اختر تصنيفًا واحدًا أو أكثر، وسيظهر المنتج في كل تصنيف تختاره.">
+          <Field id="category_ids" label="التصنيفات" required error={fieldErrors.category_ids}>
             {categories.length ? <CategoryMultiSelect
               categories={categories}
               defaultValue={selectedCategoryIds?.length ? selectedCategoryIds : product ? [product.category_id] : []}
               invalid={Boolean(fieldErrors.category_ids)}
-              describedBy={fieldErrors.category_ids ? "category_ids-error category_ids-hint" : "category_ids-hint"}
+              describedBy={fieldErrors.category_ids ? "category_ids-error" : undefined}
               onChange={() => clearFieldError("category_ids")}
             /> : <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-warning">لا توجد تصنيفات متاحة. أنشئ تصنيفًا أولًا قبل حفظ المنتج.</p>}
           </Field>

@@ -77,7 +77,7 @@ export function StoreFooter({
     <footer className="mt-auto border-t border-white/10 bg-navy text-white">
       <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_0.8fr_1fr] lg:px-8 lg:py-14">
         <div className="max-w-md">
-          <Link href="/" className="inline-flex rounded-sm text-xl font-bold tracking-tight transition hover:text-cyan-300 focus-visible:outline-white">{storeName}</Link>
+          <TopLink href="/" className="inline-flex rounded-sm text-xl font-bold tracking-tight transition hover:text-cyan-300 focus-visible:outline-white">{storeName}</TopLink>
           <p className="mt-3 text-sm leading-7 text-white/65">{description}</p>
           <TopLink href="/products" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-navy transition hover:bg-cyan-50 focus-visible:outline-white">
             تصفّح المنتجات <span aria-hidden="true">←</span>
@@ -96,7 +96,7 @@ export function StoreFooter({
         <div>
           <h2 className="text-sm font-semibold">معلومات تهمك</h2>
           <ul className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 text-sm text-white/65">
-            {policyLinks.map(([label, href]) => <li key={href}><Link className="inline-flex min-h-8 items-center transition hover:text-white focus-visible:outline-white" href={href}>{label}</Link></li>)}
+            {policyLinks.map(([label, href]) => <li key={href}><TopLink className="inline-flex min-h-8 items-center transition hover:text-white focus-visible:outline-white" href={href}>{label}</TopLink></li>)}
           </ul>
         </div>
       </div>
