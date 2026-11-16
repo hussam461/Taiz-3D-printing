@@ -61,7 +61,42 @@ export default async function ProductPage({
   }[];
   const image = images.find((item) => item.is_main) ?? images[0] ?? null;
   const specs = (product.specifications ?? []) as Specification[];
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taiz-3d-printing.vercel.app").replace(/\/+$/, "");
+  const productUrl = `${siteUrl}/products/${encodeURIComponent(product.slug)}`;
+  const productImages = images
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((item) => publicMediaUrl(item.storage_path))
+    .filter((url): url is string => Boolean(url));
+  const productStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: productDescriptionToText(product.description ?? "").trim(),
+    ...(productImages.length ? { image: productImages } : {}),
+    url: productUrl,
+    brand: {
+      "@type": "Brand",
+      name: "Taiz 3D Printing",
+    },
+    ...(product.categories?.name ? { category: product.categories.name } : {}),
+    offers: {
+      "@type": "Offer",
+      url: productUrl,
+      priceCurrency: "YER",
+      price: priced.unitFinalPriceOldYer,
+      itemCondition: "https://schema.org/NewCondition",
+      seller: {
+        "@type": "Organization",
+        name: "Taiz 3D Printing",
+      },
+    },
+  };
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(productStructuredData).replace(/</g, "\\u003c") }}
+    />
     <div className="min-w-0 max-w-full space-y-5 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
       <nav aria-label="مسار الصفحة" className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <Link href="/" className="transition hover:text-primary">الرئيسية</Link>
@@ -116,5 +151,6 @@ export default async function ProductPage({
       {related.length ? <ProductsCarousel products={related} defaultColor={colors.find((color) => color.is_default) ?? colors[0] ?? null} defaultMaterial={materials.find((material) => material.is_default) ?? materials[0] ?? null} heading="منتجات مشابهة" headingId="related-products-heading" viewAllHref={`/products?category=${encodeURIComponent(product.categories?.slug ?? "")}`} /> : null}
       {featured.filter((item) => item.id !== product.id).length ? <ProductsCarousel products={featured.filter((item) => item.id !== product.id)} defaultColor={colors.find((color) => color.is_default) ?? colors[0] ?? null} defaultMaterial={materials.find((material) => material.is_default) ?? materials[0] ?? null} heading="منتجات قد تعجبك" headingId="recommended-products-heading" viewAllHref="/products?featured=1" /> : null}
     </div>
+    </>
   );
 }
