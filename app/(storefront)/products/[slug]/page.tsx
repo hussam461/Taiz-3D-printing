@@ -23,6 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title,
     description: description.slice(0, 160),
+    alternates: { canonical: `/products/${encodeURIComponent(product.slug)}` },
     openGraph: {
       title,
       description: description.slice(0, 160),

@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { getFaq } from "@/lib/queries/storefront";
+
+export const metadata: Metadata = { alternates: { canonical: "/faq" } };
 
 export default async function FaqPage() {
   const items = await getFaq();

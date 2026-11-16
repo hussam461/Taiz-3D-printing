@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   getActiveCategories,
@@ -16,6 +17,10 @@ import { publicMediaUrl } from "@/lib/storage/public-url";
 import { HomepageBenefitCard } from "@/components/storefront/homepage-benefit-card";
 import { Suspense } from "react";
 import { StorefrontPageLoading } from "@/components/storefront/page-loading";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default function HomePage() {
   return <Suspense fallback={<StorefrontPageLoading kind="home" />}><HomePageContent /></Suspense>;

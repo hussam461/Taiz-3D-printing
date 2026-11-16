@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { getActiveCategories, getColors, getMaterials, searchProducts } from "@/lib/queries/storefront";
 import { ProductResults } from "@/components/storefront/product-results";
 import { ProductFilters } from "@/components/storefront/product-filters";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/products" },
+};
 
 export default async function ProductsPage({
   searchParams,

@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { getCustomOrderContent, getStorefrontContext } from "@/lib/queries/storefront";
 import { publicMediaUrl } from "@/lib/storage/public-url";
+
+export const metadata: Metadata = { alternates: { canonical: "/custom-order" } };
 
 function WhatsAppIcon() {
   return (

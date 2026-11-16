@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { getStorefrontContext } from "@/lib/queries/storefront";
+
+export const metadata: Metadata = { alternates: { canonical: "/contact" } };
 
 type ContactKind = "phone" | "whatsapp" | "instagram" | "email";
 
