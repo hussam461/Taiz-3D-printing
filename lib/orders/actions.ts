@@ -2,6 +2,7 @@
 
 import { createOrderFromCheckout } from "@/lib/orders/create-order";
 import { createServiceClient } from "@/lib/supabase/service";
+import { hasValidPaymentProofSignature } from "@/lib/validation/payment-proof";
 import { ALLOWED_PROOF_TYPES, MAX_PROOF_BYTES } from "@/types/domain";
 
 const stagingPathPattern = /^checkout-staging\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/i;
@@ -24,10 +25,15 @@ export async function uploadCheckoutProof(formData: FormData) {
     return { ok: false as const, error: "حجم الملف أكبر من 8 ميغابايت. اختر ملفًا أصغر." };
   }
 
+  const fileBytes = Buffer.from(await value.arrayBuffer());
+  if (!hasValidPaymentProofSignature(value.type, fileBytes)) {
+    return { ok: false as const, error: "محتوى الملف لا يطابق نوعه. اختر صورة أو PDF صالحًا." };
+  }
+
   const path = `checkout-staging/${crypto.randomUUID()}.${proofExtensions[value.type]}`;
   try {
     const supabase = createServiceClient();
-    const { error } = await supabase.storage.from("payment-proofs").upload(path, Buffer.from(await value.arrayBuffer()), {
+    const { error } = await supabase.storage.from("payment-proofs").upload(path, fileBytes, {
       contentType: value.type,
       upsert: false,
     });

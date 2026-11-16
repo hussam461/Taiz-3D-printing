@@ -5,6 +5,7 @@ import {
   calculateOrderTotals,
 } from "@/lib/pricing";
 import { ALLOWED_PROOF_TYPES, MAX_PROOF_BYTES } from "@/types/domain";
+import { hasValidPaymentProofSignature } from "@/lib/validation/payment-proof";
 
 export type CreateOrderResult =
   | {
@@ -143,6 +144,10 @@ export async function createOrderFromCheckout(
   const { data: proofFile, error: stagedProofError } = await supabase.storage.from("payment-proofs").download(stagedProofPath);
   if (stagedProofError || !proofFile || !isAllowedProof(proofFile.type, proofFile.size)) {
     return { ok: false, error: "تعذر التحقق من صورة الإثبات. أعد رفعها ثم حاول مرة أخرى.", proofMustBeReuploaded: true };
+  }
+  const proofHeader = new Uint8Array(await proofFile.slice(0, 12).arrayBuffer());
+  if (!hasValidPaymentProofSignature(proofFile.type, proofHeader)) {
+    return { ok: false, error: "محتوى ملف الإثبات غير صالح. أعد رفع صورة أو PDF صحيحًا.", proofMustBeReuploaded: true };
   }
   const proofType = proofFile.type;
   const proofSize = proofFile.size;

@@ -4,11 +4,12 @@ import { searchProducts, type ProductListQuery } from "@/lib/queries/storefront"
 export const dynamic = "force-dynamic";
 
 const SORT_OPTIONS = new Set(["newest", "price_asc", "price_desc", "relevance"]);
+const MAX_PRODUCT_SEARCH_PAGE = 1_000;
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const rawPage = Number(params.get("page") ?? "1");
-  if (!Number.isSafeInteger(rawPage) || rawPage < 1 || rawPage > 10_000) {
+  if (!Number.isSafeInteger(rawPage) || rawPage < 1 || rawPage > MAX_PRODUCT_SEARCH_PAGE) {
     return NextResponse.json({ error: "رقم صفحة المنتجات غير صالح." }, { status: 400 });
   }
 

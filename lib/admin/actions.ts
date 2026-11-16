@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdmin, safeAdminNextPath } from "@/lib/auth/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { canTransition } from "@/lib/orders/transitions";
@@ -45,7 +45,7 @@ function isStorageObjectPath(path: unknown): path is string {
 export async function loginAdmin(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/admin");
+  const next = safeAdminNextPath(String(formData.get("next") ?? "/admin"));
   if (!email || !password) {
     return { ok: false as const, error: "أدخل البريد الإلكتروني وكلمة المرور." };
   }
@@ -68,15 +68,24 @@ export async function loginAdmin(formData: FormData) {
 
   const { data: profile, error: profileError } = await supabase
     .from("admin_profiles")
-    .select("user_id")
+    .select("user_id, role")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (profileError || !profile) {
+  if (profileError || !profile || profile.role !== "admin") {
     await supabase.auth.signOut();
     return { ok: false as const, error: "البريد الإلكتروني أو كلمة المرور غير صحيحة. تحقق منهما وحاول مرة أخرى." };
   }
 
-  redirect(next.startsWith("/admin") ? next : "/admin");
+  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (assuranceError || !assurance) {
+    await supabase.auth.signOut();
+    return { ok: false as const, error: "تعذر التحقق من إعداد المصادقة الثنائية. أعد المحاولة." };
+  }
+  if (assurance.currentLevel !== "aal2") {
+    const mfaPath = assurance.nextLevel === "aal2" ? "/admin/mfa/verify" : "/admin/mfa/setup";
+    redirect(`${mfaPath}?next=${encodeURIComponent(next)}`);
+  }
+  redirect(next);
 }
 
 export async function logoutAdmin() {

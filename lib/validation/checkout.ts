@@ -26,7 +26,7 @@ export const checkoutItemSchema = z.object({
 
 export const checkoutPayloadSchema = z.object({
   idempotencyKey: z.string().uuid(),
-  items: z.array(checkoutItemSchema).min(1, "السلة فارغة"),
+  items: z.array(checkoutItemSchema).min(1, "السلة فارغة").max(50, "لا يمكن أن يحتوي الطلب على أكثر من 50 بندًا."),
   customerName: z.string().trim().min(2, "الاسم مطلوب").max(120),
   customerPhone: yemenPhoneSchema,
   customerEmail: z

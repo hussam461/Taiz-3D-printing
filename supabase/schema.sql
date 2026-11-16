@@ -434,7 +434,8 @@ stable
 security definer
 set search_path = public
 as $$
-  select exists (
+  select coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2'
+    and exists (
     select 1 from public.admin_profiles
     where user_id = auth.uid() and role = 'admin'
   );
