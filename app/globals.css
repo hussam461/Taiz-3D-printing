@@ -15,7 +15,7 @@
   --color-warning: #b45309;
   --color-error: #b91c1c;
   --color-info: #1d4ed8;
-  --font-sans: var(--font-arabic);
+  --font-sans: var(--font-arabic), var(--font-arabic-latin), Tahoma, Arial, sans-serif;
 }
 
 :root {
@@ -43,7 +43,7 @@ html {
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-arabic), "IBM Plex Sans Arabic", Tahoma, sans-serif;
+  font-family: var(--font-arabic), var(--font-arabic-latin), Tahoma, Arial, sans-serif;
 }
 
 .storefront-shell {
