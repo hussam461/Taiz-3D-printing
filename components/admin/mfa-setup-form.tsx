@@ -1,11 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 
+function normalizeQrDataUrl(value: string) {
+  const trimmed = value.trim();
+  const commaIndex = trimmed.indexOf(",");
+  if (!trimmed.startsWith("data:image/svg+xml") || commaIndex < 0 || trimmed.slice(0, commaIndex).includes(";base64")) {
+    return trimmed;
+  }
+
+  const metadata = trimmed.slice(0, commaIndex);
+  const payload = trimmed.slice(commaIndex + 1);
+  let svg = payload;
+  try {
+    svg = decodeURIComponent(payload);
+  } catch {
+    // Raw SVG may contain percent signs that are not URL escapes.
+  }
+  return `${metadata},${encodeURIComponent(svg)}`;
+}
+
 export function AdminMfaSetupForm({ next }: { next: string }) {
+  const factorName = "Taiz 3D Printing Admin";
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const router = useRouter();
   const started = useRef(false);
@@ -13,19 +32,67 @@ export function AdminMfaSetupForm({ next }: { next: string }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [loadingFactor, setLoadingFactor] = useState(true);
+
+  const startEnrollment = useCallback(async () => {
+    setLoadingFactor(true);
+    setError("");
+    setFactor(null);
+    try {
+      let { data, error: enrollError } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: factorName,
+      });
+
+      // A previous interrupted setup can leave an unverified factor behind.
+      // Remove only that incomplete factor, then create a fresh QR code.
+      if (enrollError?.code === "mfa_factor_name_conflict") {
+        const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+        if (!listError) {
+          const incompleteFactor = factors.all.find((factor) =>
+            factor.factor_type === "totp" &&
+            factor.status === "unverified" &&
+            factor.friendly_name === factorName
+          );
+
+          if (incompleteFactor) {
+            const { error: cleanupError } = await supabase.auth.mfa.unenroll({ factorId: incompleteFactor.id });
+            if (!cleanupError) {
+              const retry = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: factorName });
+              data = retry.data;
+              enrollError = retry.error;
+            } else {
+              setError(`وجدنا إعداد TOTP غير مكتمل وتعذر تنظيفه. رمز الخطأ: ${cleanupError.code ?? "unknown"}`);
+              return;
+            }
+          }
+        }
+      }
+
+      if (enrollError || !data) {
+        const errorCode = enrollError?.code;
+        setError(errorCode === "mfa_totp_enroll_not_enabled"
+          ? `تسجيل TOTP معطّل في إعدادات MFA بمشروع Supabase. رمز الخطأ: ${errorCode}`
+          : errorCode === "mfa_factor_name_conflict"
+            ? "يوجد عامل مصادقة بهذا الاسم. لم نحذفه لأنه غير معروف كإعداد غير مكتمل؛ أعد المحاولة أو راجع عوامل المصادقة للحساب."
+          : errorCode
+            ? `رفض Supabase إنشاء رمز الربط. رمز الخطأ: ${errorCode}`
+            : "تعذر إنشاء رمز الربط دون رمز خطأ. تحقق من جلسة المدير والاتصال بمشروع Supabase، ثم أعد المحاولة.");
+        return;
+      }
+      setFactor({ id: data.id, qrCode: normalizeQrDataUrl(data.totp.qr_code), secret: data.totp.secret });
+    } catch {
+      setError("تعذر الاتصال بخدمة المصادقة. تحقق من الاتصال ثم أعد المحاولة.");
+    } finally {
+      setLoadingFactor(false);
+    }
+  }, [factorName, supabase]);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Taiz 3D Printing Admin" })
-      .then(({ data, error: enrollError }) => {
-        if (enrollError || !data) {
-          setError("تعذر إعداد المصادقة الثنائية. تأكد من تفعيل TOTP في إعدادات Supabase ثم أعد المحاولة.");
-          return;
-        }
-        setFactor({ id: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret });
-      });
-  }, [supabase]);
+    void startEnrollment();
+  }, [startEnrollment]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,6 +135,12 @@ export function AdminMfaSetupForm({ next }: { next: string }) {
         <input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" dir="ltr" maxLength={6} className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-center text-xl tracking-[0.4em] focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10" placeholder="000000" />
       </label>
       <button disabled={pending || code.length !== 6} className="min-h-12 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">{pending ? "جارٍ التحقق..." : "تأكيد وربط الحساب"}</button>
-    </> : <div className="rounded-xl border border-border bg-slate-50 p-4 text-sm text-muted">جارٍ تجهيز رمز الربط...</div>}
+    </> : loadingFactor ? (
+      <div role="status" className="rounded-xl border border-border bg-slate-50 p-4 text-sm text-muted">جارٍ تجهيز رمز الربط...</div>
+    ) : error ? (
+      <button type="button" onClick={() => void startEnrollment()} className="min-h-11 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-text transition hover:bg-slate-50">
+        إعادة المحاولة
+      </button>
+    ) : null}
   </form>;
 }
