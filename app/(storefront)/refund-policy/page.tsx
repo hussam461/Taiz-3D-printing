@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
 import LegalRoute from "@/components/storefront/legal-page";
+import { getLegalPageMetadata } from "@/lib/public-metadata";
 
-export const metadata: Metadata = { alternates: { canonical: "/refund-policy" } };
+export function generateMetadata() {
+  return getLegalPageMetadata("refund-policy", "سياسة الإلغاء والاسترجاع");
+}
 
 export default function Page() {
   return <LegalRoute title="سياسة الاسترجاع" slug="refund-policy" />;

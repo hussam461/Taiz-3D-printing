@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
 import { getFaq } from "@/lib/queries/storefront";
+import { createPublicPageMetadata } from "@/lib/public-metadata";
 
-export const metadata: Metadata = { alternates: { canonical: "/faq" } };
+export const metadata = createPublicPageMetadata(
+  "الأسئلة الشائعة",
+  "اعثر على إجابات حول منتجات الطباعة ثلاثية الأبعاد والطلبات والدفع والتوصيل في متجر Taiz 3D Printing.",
+  "/faq",
+);
 
 export default async function FaqPage() {
   const items = await getFaq();

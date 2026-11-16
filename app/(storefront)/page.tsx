@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import {
   getActiveCategories,
@@ -17,17 +16,20 @@ import { publicMediaUrl } from "@/lib/storage/public-url";
 import { HomepageBenefitCard } from "@/components/storefront/homepage-benefit-card";
 import { Suspense } from "react";
 import { StorefrontPageLoading } from "@/components/storefront/page-loading";
+import { createPublicPageMetadata } from "@/lib/public-metadata";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/" },
-};
+export const metadata = createPublicPageMetadata(
+  "طباعة ثلاثية الأبعاد ومنتجات مخصصة",
+  "اكتشف منتجات الطباعة ثلاثية الأبعاد والطلبات المخصصة من متجر Taiz 3D Printing اليمني.",
+  "/",
+);
 
 export default function HomePage() {
   return <Suspense fallback={<StorefrontPageLoading kind="home" />}><HomePageContent /></Suspense>;
 }
 
 async function HomePageContent() {
-  const [{ store }, categories, featured, latest, slides, benefits, colors, materials] = await Promise.all([
+  const [{ store, contact }, categories, featured, latest, slides, benefits, colors, materials] = await Promise.all([
     getStorefrontContext(),
     getActiveCategories(),
     getFeaturedProducts(),
@@ -44,8 +46,37 @@ async function HomePageContent() {
     ...slide,
     image_url: publicMediaUrl(slide.image_path, "store-assets") ?? "",
   })).filter((slide) => slide.image_url);
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://taiz-3d-printing.vercel.app").replace(/\/+$/, "");
+  const logoUrl = publicMediaUrl(store.logo_path, "store-assets");
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${siteUrl}/#organization`,
+    name: store.store_name?.trim() || "Taiz 3D Printing",
+    url: siteUrl,
+    ...(store.description?.trim() ? { description: store.description.trim() } : {}),
+    ...(logoUrl ? { logo: new URL(logoUrl, siteUrl).toString() } : {}),
+    ...(contact.email?.trim() ? { email: contact.email.trim() } : {}),
+    ...(contact.phone?.trim() ? { telephone: contact.phone.trim() } : {}),
+    ...(contact.instagram?.trim() ? { sameAs: [contact.instagram.trim()] } : {}),
+    ...(contact.phone?.trim() || contact.email?.trim()
+      ? {
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer service",
+            ...(contact.phone?.trim() ? { telephone: contact.phone.trim() } : {}),
+            ...(contact.email?.trim() ? { email: contact.email.trim() } : {}),
+            availableLanguage: ["Arabic"],
+          },
+        }
+      : {}),
+  };
   return (
     <div className="-mt-8 space-y-10 sm:space-y-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") }}
+      />
       <section className="relative w-screen pb-3 sm:pb-4" style={{ marginInlineStart: "calc(50% - 50vw)" }}>
         {carouselSlides.length ? <HeroCarousel slides={carouselSlides} /> : <div className="flex h-[clamp(12rem,52vw,25rem)] flex-col items-center justify-center bg-navy px-6 text-center text-white sm:h-[clamp(28rem,34.4vw,41.25rem)]">
           <p className="text-sm text-accent">{store.store_name}</p>

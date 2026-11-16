@@ -1,9 +1,13 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import { getCustomOrderContent, getStorefrontContext } from "@/lib/queries/storefront";
 import { publicMediaUrl } from "@/lib/storage/public-url";
+import { createPublicPageMetadata } from "@/lib/public-metadata";
 
-export const metadata: Metadata = { alternates: { canonical: "/custom-order" } };
+export const metadata = createPublicPageMetadata(
+  "طلب طباعة ثلاثية الأبعاد مخصص",
+  "أرسل فكرتك أو تصميمك إلى Taiz 3D Printing لمراجعة إمكانية تنفيذه بالطباعة ثلاثية الأبعاد وتحديد التفاصيل والسعر.",
+  "/custom-order",
+);
 
 function WhatsAppIcon() {
   return (

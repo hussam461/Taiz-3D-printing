@@ -1,12 +1,14 @@
-import type { Metadata } from "next";
 import { getActiveCategories, getColors, getMaterials, searchProducts } from "@/lib/queries/storefront";
 import { ProductResults } from "@/components/storefront/product-results";
 import { ProductFilters } from "@/components/storefront/product-filters";
 import Link from "next/link";
+import { createPublicPageMetadata } from "@/lib/public-metadata";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/products" },
-};
+export const metadata = createPublicPageMetadata(
+  "منتجات الطباعة ثلاثية الأبعاد",
+  "تصفح منتجات مطبوعة ثلاثيًا بتصاميم متنوعة، واستكشف الأسعار والتفاصيل والخيارات المتاحة في متجر Taiz 3D Printing.",
+  "/products",
+);
 
 export default async function ProductsPage({
   searchParams,

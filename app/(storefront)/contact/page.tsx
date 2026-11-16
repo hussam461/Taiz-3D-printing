@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
 import { getStorefrontContext } from "@/lib/queries/storefront";
+import { createPublicPageMetadata } from "@/lib/public-metadata";
 
-export const metadata: Metadata = { alternates: { canonical: "/contact" } };
+export const metadata = createPublicPageMetadata(
+  "تواصل معنا",
+  "تواصل مع متجر Taiz 3D Printing للاستفسار عن المنتجات والطلبات المخصصة عبر الهاتف أو واتساب أو البريد الإلكتروني.",
+  "/contact",
+);
 
 type ContactKind = "phone" | "whatsapp" | "instagram" | "email";
 
