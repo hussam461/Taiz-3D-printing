@@ -62,7 +62,7 @@ export default async function ProductPage({
   }[];
   const image = images.find((item) => item.is_main) ?? images[0] ?? null;
   const specs = (product.specifications ?? []) as Specification[];
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taiz-3d-printing.vercel.app").replace(/\/+$/, "");
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taiz3dprinting.dev").replace(/\/+$/, "");
   const productUrl = `${siteUrl}/products/${encodeURIComponent(product.slug)}`;
   const productImages = images
     .sort((left, right) => left.sort_order - right.sort_order)

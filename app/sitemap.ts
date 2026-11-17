@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { cachePublicQuery } from "@/lib/queries/public-cache";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taiz-3d-printing.vercel.app").replace(/\/+$/, "");
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taiz3dprinting.dev").replace(/\/+$/, "");
 const productBatchSize = 500;
 
 const getPublishedProductSlugs = cachePublicQuery("sitemap-published-products", async (supabase) => {

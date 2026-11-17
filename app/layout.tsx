@@ -26,7 +26,7 @@ const latinFont = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://taiz-3d-printing.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://taiz3dprinting.dev"),
   title: {
     default: "Taiz 3D Printing",
     template: "%s | Taiz 3D Printing",

@@ -46,7 +46,7 @@ async function HomePageContent() {
     ...slide,
     image_url: publicMediaUrl(slide.image_path, "store-assets") ?? "",
   })).filter((slide) => slide.image_url);
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://taiz-3d-printing.vercel.app").replace(/\/+$/, "");
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://taiz3dprinting.dev").replace(/\/+$/, "");
   const logoUrl = publicMediaUrl(store.logo_path, "store-assets");
   const organizationSchema = {
     "@context": "https://schema.org",
