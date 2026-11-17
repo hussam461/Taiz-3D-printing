@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createOrderFromCheckout } from "@/lib/orders/create-order";
 import { createServiceClient } from "@/lib/supabase/service";
+import { checkPublicRateLimit, publicRateLimitError } from "@/lib/security/public-rate-limit";
 import { hasValidPaymentProofSignature } from "@/lib/validation/payment-proof";
 import { ALLOWED_PROOF_TYPES, MAX_PROOF_BYTES } from "@/types/domain";
 
@@ -14,6 +16,9 @@ const proofExtensions: Record<string, string> = {
 };
 
 export async function uploadCheckoutProof(formData: FormData) {
+  const rateLimit = await checkPublicRateLimit("proofUpload", await headers());
+  if (!rateLimit.allowed) return { ok: false as const, error: publicRateLimitError(rateLimit.reason) };
+
   const value = formData.get("proof");
   if (!(value instanceof File) || value.size === 0) {
     return { ok: false as const, error: "اختر صورة أو ملف PDF لإثبات التحويل." };
@@ -59,6 +64,9 @@ export async function discardCheckoutProof(path: string) {
 }
 
 export async function submitCheckoutAction(formData: FormData) {
+  const rateLimit = await checkPublicRateLimit("checkout", await headers());
+  if (!rateLimit.allowed) return { ok: false as const, error: publicRateLimitError(rateLimit.reason) };
+
   const rawItems = formData.get("items");
   let items: unknown = [];
   try {

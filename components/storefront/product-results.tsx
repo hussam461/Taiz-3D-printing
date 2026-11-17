@@ -17,6 +17,7 @@ type ProductPageResponse = {
   total: number;
   page: number;
   pageSize: number;
+  error?: string;
 };
 
 export function ProductResults({
@@ -54,8 +55,8 @@ export function ProductResults({
 
     try {
       const response = await fetch(`/api/storefront/products?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error("تعذر تحميل المنتجات الآن. حاول مرة أخرى.");
       const result = (await response.json()) as ProductPageResponse;
+      if (!response.ok) throw new Error(result.error ?? "تعذر تحميل المنتجات الآن. حاول مرة أخرى.");
       setItems((current) => {
         const existing = new Set(current.map((product) => product.id));
         return [...current, ...result.items.filter((product) => !existing.has(product.id))];

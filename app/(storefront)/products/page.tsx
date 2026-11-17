@@ -3,6 +3,8 @@ import { ProductResults } from "@/components/storefront/product-results";
 import { ProductFilters } from "@/components/storefront/product-filters";
 import Link from "next/link";
 import { createPublicPageMetadata } from "@/lib/public-metadata";
+import { headers } from "next/headers";
+import { checkPublicRateLimit, publicRateLimitError } from "@/lib/security/public-rate-limit";
 
 export const metadata = createPublicPageMetadata(
   "منتجات الطباعة ثلاثية الأبعاد",
@@ -23,6 +25,15 @@ export default async function ProductsPage({
   }>;
 }) {
   const params = await searchParams;
+  const rateLimit = await checkPublicRateLimit("productSearch", await headers());
+  if (!rateLimit.allowed) {
+    return (
+      <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-7 text-amber-950">
+        <p>{publicRateLimitError(rateLimit.reason)}</p>
+        <Link href="/" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-white px-4 font-semibold text-primary shadow-sm">العودة للرئيسية</Link>
+      </div>
+    );
+  }
   const sectionLabel = params.featured === "1" ? "مميزة" : null;
   const queryText = params.storefrontSearch ?? params.q;
   const filterParams = { ...params, q: queryText };

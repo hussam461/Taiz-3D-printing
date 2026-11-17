@@ -3,7 +3,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { requireAdmin, safeAdminNextPath } from "@/lib/auth/admin";
+import { checkPublicRateLimit, publicRateLimitError } from "@/lib/security/public-rate-limit";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { canTransition } from "@/lib/orders/transitions";
@@ -43,6 +45,9 @@ function isStorageObjectPath(path: unknown): path is string {
 }
 
 export async function loginAdmin(formData: FormData) {
+  const rateLimit = await checkPublicRateLimit("adminLogin", await headers());
+  if (!rateLimit.allowed) return { ok: false as const, error: publicRateLimitError(rateLimit.reason) };
+
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const next = safeAdminNextPath(String(formData.get("next") ?? "/admin"));
