@@ -85,6 +85,7 @@ export default async function ProductPage({
       url: productUrl,
       priceCurrency: "YER",
       price: priced.unitFinalPriceOldYer,
+      availability: "https://schema.org/InStock",
       itemCondition: "https://schema.org/NewCondition",
       seller: {
         "@type": "Organization",
