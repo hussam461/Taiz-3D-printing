@@ -47,23 +47,23 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
           return (
             <li
               key={`${item.productId}-${item.colorId}-${item.materialId}`}
-              className="relative grid grid-cols-2 gap-x-2 gap-y-2 rounded-xl border border-border bg-surface p-2 shadow-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-start sm:gap-x-4 sm:gap-y-3 sm:p-4"
+              className="relative grid min-w-0 grid-cols-2 gap-x-2 gap-y-2 rounded-xl border border-border bg-surface p-2 shadow-sm sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,14rem)] sm:items-start sm:gap-x-4 sm:gap-y-3 sm:p-4"
             >
-              <div className="col-span-2 row-start-1 flex min-w-0 items-start justify-start gap-2 border-b border-border pb-2 sm:col-span-2 sm:col-start-1 sm:gap-2.5 sm:border-0 sm:pb-0">
+              <div className="col-span-2 row-start-1 flex min-w-0 items-start justify-start gap-2 border-b border-border pb-2 sm:col-span-1 sm:col-start-1 sm:gap-2.5 sm:border-0 sm:pb-0">
               <Link href={`/products/${item.slug}`} aria-label={`عرض تفاصيل ${item.name}`} className="h-fit w-16 shrink-0 overflow-hidden rounded-lg bg-slate-50 transition-opacity hover:opacity-90 sm:w-20">
                 {image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={image} alt={item.name} className="block h-auto w-full object-contain" />
                 ) : null}
               </Link>
-              <div className="flex min-w-0 flex-col items-end gap-1 pt-1">
-                <Link href={`/products/${item.slug}`} className="font-semibold">
+              <div className="flex min-w-0 flex-col items-start gap-1 pt-1 text-right">
+                <Link href={`/products/${item.slug}`} className="min-w-0 break-words text-right font-semibold">
                   {item.name}
                 </Link>
-                <span className="text-sm text-muted">{formatOldYer(Math.round(item.basePriceOldYer * (1 - (item.discountPercent ?? 0) / 100)))}</span>
+                <span className="max-w-full break-words text-right text-sm text-muted">{formatOldYer(Math.round(item.basePriceOldYer * (1 - (item.discountPercent ?? 0) / 100)))}</span>
               </div>
               </div>
-              <div className="col-span-2 row-start-3 border-t border-border pt-2 sm:col-span-4 sm:row-start-2 sm:border-0 sm:pt-0">
+              <div className="col-span-2 row-start-3 min-w-0 border-t border-border pt-2 sm:col-span-3 sm:col-start-1 sm:row-start-3 sm:border-0 sm:pt-0">
                   {colors.length > 0 || materials.length > 0 ? <div className={`grid w-full min-w-0 max-w-sm gap-2 ${colors.length > 0 && materials.length > 0 ? "grid-cols-2" : "grid-cols-1"}`}>
                   {colors.length > 0 ? <fieldset className="grid min-w-0 max-w-full gap-2 text-xs text-muted"><legend className="text-right font-semibold text-text">اللون</legend><div className="storefront-color-options w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2 touch-pan-x"><div className="flex w-max min-w-full flex-nowrap items-center justify-start gap-3 whitespace-nowrap">
                     {[...colors].sort((a,b) => Number(isCurrentColor(b.name))-Number(isCurrentColor(a.name))).map((color) => <button key={color.id} type="button" aria-label={color.name} aria-pressed={item.colorId === color.id} title={color.name} onClick={() => setVariant(item.productId, item.colorId, item.materialId, color.id, color.name, item.materialId, item.materialName)} className={`shrink-0 ${isCurrentColor(color.name) ? `inline-flex min-h-7 translate-y-1 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition ${item.colorId === color.id ? "border-teal-600 bg-teal-50 text-teal-800" : "border-border text-muted hover:border-teal-500"}` : `flex min-w-11 flex-col items-center gap-1 rounded-lg px-1.5 py-1.5 transition ${item.colorId === color.id ? "bg-teal-50 text-teal-700" : "hover:bg-slate-50"}`} `}>
@@ -80,7 +80,7 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
                   </label> : null}
                 </div> : null}
               </div>
-              <div className="absolute left-4 top-4 flex items-center gap-3 sm:static sm:col-start-4 sm:row-start-1 sm:pt-1">
+              <div className="absolute left-2 top-2 z-20 flex items-center gap-3">
                   <button
                     type="button"
                     aria-label={`إزالة ${item.name} من السلة`}
@@ -90,9 +90,11 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
                     ×
                   </button>
               </div>
-              <div className="col-span-2 row-start-2 flex items-center justify-center gap-2 border-b border-border pb-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:gap-3 sm:border-0 sm:pb-0">
-                <QuantityStepper quantity={item.quantity} onChange={(value) => setQuantity(item.productId, item.colorId, item.materialId, value)} className="w-36" />
-                <span className="whitespace-nowrap font-semibold text-teal-700">المجموع: {formatOldYer(Math.round(item.basePriceOldYer * (1 - (item.discountPercent ?? 0) / 100)) * item.quantity)}</span>
+              <div className="col-start-1 row-start-2 flex min-w-0 items-center justify-self-start border-b border-border pb-2 sm:col-start-1 sm:row-start-2 sm:border-0 sm:pb-0">
+                <QuantityStepper quantity={item.quantity} onChange={(value) => setQuantity(item.productId, item.colorId, item.materialId, value)} className="w-32 sm:w-36" />
+              </div>
+              <div className="col-start-2 row-start-2 flex min-w-0 max-w-full items-center justify-self-end border-b border-border pb-2 text-left sm:col-start-3 sm:row-start-2 sm:max-w-56 sm:items-start sm:border-0 sm:pb-0">
+                <span className="max-w-full break-words text-[11px] font-semibold leading-4 text-teal-700 sm:text-xs">المجموع: {formatOldYer(Math.round(item.basePriceOldYer * (1 - (item.discountPercent ?? 0) / 100)) * item.quantity)}</span>
               </div>
             </li>
           );

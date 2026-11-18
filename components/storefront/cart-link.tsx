@@ -35,12 +35,12 @@ export function CartLink() {
           <path d="M3.5 4.5h2l2.1 10.1a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.5L21 8H6.2M10 20a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm7 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {ready && count > 0 ? (
-          <span aria-hidden="true" className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-700 px-1 text-[11px] font-semibold text-white ring-2 ring-white">
+          <span aria-hidden="true" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-700 px-0.5 text-[9px] font-semibold text-white ring-2 ring-white">
             {count}
           </span>
         ) : null}
       </span>
-      <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums tracking-tight text-navy sm:text-sm">{totalLabel}</span>
+      <span className="whitespace-nowrap text-[11px] font-semibold tabular-nums tracking-tight text-navy sm:text-xs">{totalLabel}</span>
     </Link>
   );
 }

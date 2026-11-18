@@ -11,7 +11,9 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [interacting, setInteracting] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [loadingPlaceholderUrl, setLoadingPlaceholderUrl] = useState<string | null>(null);
   const activeIndexRef = useRef(0);
+  const loadedHeroImages = useRef(new Set<string>());
   const navigationPending = useRef(false);
   const failedImages = useRef(new Set<string>());
   const imagePreloads = useRef(new Map<string, Promise<void>>());
@@ -20,6 +22,12 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   const suppressClick = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const multiple = slides.length > 1;
+  const activeImageUrl = slides[activeIndex]?.image_url ?? slides[0]?.image_url ?? null;
+  const activeImageUrlRef = useRef(activeImageUrl);
+
+  useEffect(() => {
+    activeImageUrlRef.current = activeImageUrl;
+  }, [activeImageUrl]);
 
   const preloadImage = useCallback((src: string) => {
     const existing = imagePreloads.current.get(src);
@@ -69,6 +77,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
         setImageLoadError(false);
         setPreviousIndex(activeIndexRef.current);
         activeIndexRef.current = nextIndex;
+        activeImageUrlRef.current = slides[nextIndex].image_url;
         setActiveIndex(nextIndex);
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
         transitionTimeout.current = window.setTimeout(() => {
@@ -88,6 +97,22 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
     if (failedImages.current.has(nextSlide.image_url)) return;
     void preloadImage(nextSlide.image_url).catch(() => failedImages.current.add(nextSlide.image_url));
   }, [activeIndex, multiple, preloadImage, slides]);
+
+  useEffect(() => {
+    if (!activeImageUrl || loadedHeroImages.current.has(activeImageUrl)) {
+      setLoadingPlaceholderUrl(null);
+      return;
+    }
+
+    setLoadingPlaceholderUrl(null);
+    const timer = window.setTimeout(() => {
+      if (activeImageUrlRef.current === activeImageUrl && !loadedHeroImages.current.has(activeImageUrl)) {
+        setLoadingPlaceholderUrl(activeImageUrl);
+      }
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [activeImageUrl]);
 
   useEffect(() => {
     if (!multiple || prefersReducedMotion || interacting) return;
@@ -114,7 +139,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
       aria-label="العروض والخدمات الرئيسية"
       aria-roledescription="معرض شرائح"
       aria-live="off"
-      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-navy lg:aspect-auto lg:h-[clamp(28rem,34.4vw,41.25rem)]"
+      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary lg:aspect-auto lg:h-[clamp(28rem,34.4vw,41.25rem)]"
       onPointerDown={(event) => { pointerStartX.current = event.clientX; suppressClick.current = false; }}
       onPointerUp={(event) => {
         if (pointerStartX.current === null) return;
@@ -136,7 +161,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
       onFocus={() => setInteracting(true)}
       onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setInteracting(false); }}
     >
-      <div className="absolute inset-0 bg-navy" aria-hidden="true">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary" aria-hidden="true">
         {slides.map((item, index) => {
           const isActive = index === activeIndex;
           const isPrevious = index === previousIndex;
@@ -144,23 +169,31 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
           return (
             <div key={item.id} className={`absolute inset-0 ${isActive ? `z-20 opacity-100 ${previousIndex !== null && !prefersReducedMotion ? "hero-slide-enter" : ""}` : "z-10 opacity-100"}`}>
               <Image src={item.image_url} alt="" fill sizes="100vw" unoptimized aria-hidden="true" className="scale-110 object-cover object-center opacity-60 blur-2xl" />
-              <Image src={item.image_url} alt="" fill priority={isActive && activeIndex === 0} sizes="100vw" unoptimized className="z-10 object-contain object-center lg:object-cover" />
+              <Image src={item.image_url} alt="" fill priority={isActive && activeIndex === 0} sizes="100vw" unoptimized onLoad={() => {
+                loadedHeroImages.current.add(item.image_url);
+                if (activeImageUrlRef.current === item.image_url) setLoadingPlaceholderUrl(null);
+              }} className="z-10 object-contain object-center lg:object-cover" />
               <div className="absolute inset-0 z-20 bg-gradient-to-b from-navy/10 via-transparent to-navy/35" />
             </div>
           );
         })}
+        {loadingPlaceholderUrl === slide.image_url ? (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30 overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary">
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/[0.08] to-transparent motion-reduce:animate-none" />
+          </div>
+        ) : null}
       </div>
 
       {slide.href ? (
-        <Link href={slide.href} aria-label={slide.title?.trim() || "اكتشف المزيد"} className="absolute inset-0 z-20 block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white">{content}</Link>
-      ) : <div className="absolute inset-0 z-20">{content}</div>}
+        <Link href={slide.href} aria-label={slide.title?.trim() || "اكتشف المزيد"} className="absolute inset-0 z-40 block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white">{content}</Link>
+      ) : <div className="absolute inset-0 z-40">{content}</div>}
 
-      {imageLoadError ? <p role="status" className="absolute inset-x-3 bottom-8 z-40 mx-auto w-fit rounded-full bg-navy/90 px-3 py-1.5 text-center text-xs text-white shadow-lg sm:bottom-12">تعذر تحميل صورة هذا البانر</p> : null}
+      {imageLoadError ? <p role="status" className="absolute inset-x-3 bottom-8 z-50 mx-auto w-fit rounded-full bg-navy/90 px-3 py-1.5 text-center text-xs text-white shadow-lg sm:bottom-12">تعذر تحميل صورة هذا البانر</p> : null}
 
       {multiple ? <>
-        <button type="button" onClick={() => { void goTo(activeIndex - 1); }} aria-label="الشريحة السابقة" className="absolute start-3 top-1/2 z-30 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-navy shadow-lg transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:start-5 sm:inline-flex sm:h-12 sm:w-12">›</button>
-        <button type="button" onClick={() => { void goTo(activeIndex + 1); }} aria-label="الشريحة التالية" className="absolute end-3 top-1/2 z-30 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-navy shadow-lg transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:end-5 sm:inline-flex sm:h-12 sm:w-12">‹</button>
-        <div className="absolute inset-x-0 bottom-3 z-30 flex items-center justify-center gap-1.5 sm:bottom-5 sm:gap-2" aria-label="اختيار البانر">
+        <button type="button" onClick={() => { void goTo(activeIndex - 1); }} aria-label="الشريحة السابقة" className="absolute start-3 top-1/2 z-50 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-navy shadow-lg transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:start-5 sm:inline-flex sm:h-12 sm:w-12">›</button>
+        <button type="button" onClick={() => { void goTo(activeIndex + 1); }} aria-label="الشريحة التالية" className="absolute end-3 top-1/2 z-50 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-navy shadow-lg transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:end-5 sm:inline-flex sm:h-12 sm:w-12">‹</button>
+        <div className="absolute inset-x-0 bottom-3 z-50 flex items-center justify-center gap-1.5 sm:bottom-5 sm:gap-2" aria-label="اختيار البانر">
           {slides.map((item, index) => <button key={item.id} type="button" onClick={() => { void goTo(index); }} aria-label={`البانر ${index + 1}`} aria-current={index === activeIndex ? "true" : undefined} className={`h-1.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:h-2 ${index === activeIndex ? "w-6 bg-white" : "w-1.5 bg-white/60 hover:bg-white/90 sm:w-2"}`} />)}
         </div>
       </> : null}
