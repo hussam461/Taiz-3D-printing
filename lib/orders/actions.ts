@@ -27,7 +27,7 @@ export async function uploadCheckoutProof(formData: FormData) {
     return { ok: false as const, error: "نوع الملف غير مدعوم. ارفع صورة JPG أو PNG أو WebP أو ملف PDF." };
   }
   if (value.size > MAX_PROOF_BYTES) {
-    return { ok: false as const, error: "حجم الملف أكبر من 8 ميغابايت. اختر ملفًا أصغر." };
+    return { ok: false as const, error: "حجم الملف أكبر من 5 ميغابايت. اختر ملفًا أصغر." };
   }
 
   const fileBytes = Buffer.from(await value.arrayBuffer());

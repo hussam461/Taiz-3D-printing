@@ -254,8 +254,7 @@ const getCachedFeaturedProducts = cachePublicQuery("featured-products", async (s
     )
     .eq("is_active", true)
     .eq("is_featured", true)
-    .order("created_at", { ascending: false })
-    .limit(8);
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return mapProducts(data ?? []);
 });

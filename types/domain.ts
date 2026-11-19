@@ -29,7 +29,7 @@ export type MoneyOldYer = number;
 
 export const DEFAULT_DEPOSIT_PERCENT = 30;
 export const MAX_CART_QUANTITY = 9999;
-export const MAX_PROOF_BYTES = 8 * 1024 * 1024;
+export const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_PROOF_TYPES = [
   "image/jpeg",
   "image/png",

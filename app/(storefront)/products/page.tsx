@@ -69,7 +69,7 @@ export default async function ProductsPage({
         <span aria-hidden="true">›</span>
         {selectedCategory ? <><Link href="/products" className="transition hover:text-primary">جميع المنتجات</Link><span aria-hidden="true">›</span><span aria-current="page" className="font-medium text-text">{selectedCategory.name}</span></> : sectionLabel ? <><Link href="/products" className="transition hover:text-primary">جميع المنتجات</Link><span aria-hidden="true">›</span><span aria-current="page" className="font-medium text-text">{sectionLabel}</span></> : <span aria-current="page" className="font-medium text-text">جميع المنتجات</span>}
       </nav>
-      <ProductFilters params={filterParams} />
+      <ProductFilters key={`filters-${resultsKey}`} params={filterParams} categories={categories} />
       {result.items.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface p-8 text-center text-muted">
           لا توجد منتجات مطابقة.

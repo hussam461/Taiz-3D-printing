@@ -827,7 +827,7 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values
   ('product-images', 'product-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp']::text[]),
   ('store-assets', 'store-assets', true, 5242880, array['image/jpeg', 'image/png', 'image/webp']::text[]),
-  ('payment-proofs', 'payment-proofs', false, 10485760, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']::text[]),
+  ('payment-proofs', 'payment-proofs', false, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']::text[]),
   ('custom-order-files', 'custom-order-files', false, 10485760, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'model/stl']::text[])
 on conflict (id) do update set
   public = excluded.public,

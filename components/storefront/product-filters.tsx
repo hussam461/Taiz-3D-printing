@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { Category } from "@/lib/queries/storefront";
 
 type FilterParams = {
   q?: string;
@@ -10,7 +11,7 @@ type FilterParams = {
   sort?: string;
 };
 
-export function ProductFilters({ params }: { params: FilterParams }) {
+export function ProductFilters({ params, categories }: { params: FilterParams; categories: Category[] }) {
   const router = useRouter();
 
   function applyFilters(event: React.ChangeEvent<HTMLFormElement>) {
@@ -24,19 +25,26 @@ export function ProductFilters({ params }: { params: FilterParams }) {
   }
 
   return (
-    <form dir="rtl" onChange={applyFilters} className="flex flex-nowrap items-center gap-2 text-xs sm:gap-3 sm:text-sm">
+    <form dir="rtl" onChange={applyFilters} className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-1 text-[10px] sm:flex sm:w-auto sm:flex-nowrap sm:gap-3 sm:text-sm">
       <input type="hidden" name="q" value={params.q ?? ""} />
       {params.featured === "1" ? <input type="hidden" name="featured" value="1" /> : null}
-      {params.category ? <input type="hidden" name="category" value={params.category} /> : null}
-      <label className="inline-flex shrink-0 items-center gap-1 font-medium text-muted sm:gap-2" htmlFor="product-sort">ترتيب حسب
-        <select id="product-sort" name="sort" defaultValue={params.sort ?? "newest"} className="min-h-10 w-24 rounded-lg border border-border bg-white px-1.5 text-xs font-normal text-text focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 sm:w-40 sm:px-2.5 sm:text-sm">
+      <label className="flex w-full min-w-0 flex-col gap-0.5 sm:w-auto sm:shrink-0" htmlFor="product-category">
+        <span className="px-1 text-[10px] leading-3 text-muted sm:text-xs">التصنيف</span>
+        <select id="product-category" name="category" defaultValue={params.category ?? ""} className="min-h-9 w-full min-w-0 rounded-lg border border-border bg-white px-1 text-[10px] text-text sm:min-h-10 sm:w-40 sm:px-2.5 sm:text-sm">
+          <option value="">كل التصنيفات</option>
+          {categories.map((category) => <option key={category.id} value={category.slug}>{category.name}</option>)}
+        </select>
+      </label>
+      <label className="flex w-full min-w-0 flex-col gap-0.5 sm:w-auto sm:shrink-0" htmlFor="product-sort">
+        <span className="px-1 text-[10px] leading-3 text-muted sm:text-xs">ترتيب حسب</span>
+        <select id="product-sort" name="sort" defaultValue={params.sort ?? "newest"} className="min-h-9 w-full min-w-0 rounded-lg border border-border bg-white px-1 text-[10px] font-normal text-text sm:min-h-10 sm:w-40 sm:px-2.5 sm:text-sm">
           <option value="newest">الأحدث</option>
           <option value="price_asc">السعر من الأقل</option>
           <option value="price_desc">السعر من الأعلى</option>
           {params.q ? <option value="relevance">الأكثر صلة</option> : null}
         </select>
       </label>
-      <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-medium text-text sm:gap-2 sm:text-sm">
+      <label className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap text-[10px] font-medium text-text sm:min-h-10 sm:justify-start sm:gap-2 sm:text-sm">
         <input type="checkbox" name="discounted" value="1" defaultChecked={params.discounted === "1"} className="h-4 w-4 shrink-0 accent-primary" />
         <span>عروض الخصم فقط</span>
       </label>

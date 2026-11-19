@@ -98,18 +98,6 @@ body {
   height: 0;
 }
 
-.checkout-form :is(input, select, textarea):focus-visible {
-  outline: none;
-  outline-offset: 0;
-  box-shadow: none;
-}
-
-.storefront-shell :is(input, select, textarea):focus-visible {
-  outline: none;
-  outline-offset: 0;
-  box-shadow: none;
-}
-
 .storefront-shell :is(a[href], button):active {
   opacity: 0.78;
 }

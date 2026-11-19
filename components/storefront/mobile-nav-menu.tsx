@@ -63,7 +63,7 @@ export function MobileNavMenu({ items, storeName, categories }: { items: NavItem
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative xl:hidden">
+    <div ref={rootRef} className="relative translate-x-3 xl:hidden">
       <button
         ref={triggerRef}
         type="button"
@@ -74,9 +74,9 @@ export function MobileNavMenu({ items, storeName, categories }: { items: NavItem
         className="inline-flex h-11 w-11 cursor-pointer items-center justify-center text-navy transition-colors hover:text-teal-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         {open ? (
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
         ) : (
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-6 w-6"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
         )}
       </button>
       {mounted ? createPortal(
