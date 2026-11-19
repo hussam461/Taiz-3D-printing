@@ -7,6 +7,7 @@ import { calculateOrderTotals } from "@/lib/pricing";
 import { formatIntegerWestern, formatOldYer } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import { QuantityStepper } from "@/components/storefront/quantity-stepper";
+import { StorefrontSelect } from "@/components/storefront/storefront-select";
 
 type CartOption = { id: string; name: string; hex_code?: string | null };
 
@@ -70,13 +71,11 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
                       {isCurrentColor(color.name) ? <><span className="h-3 w-3">{item.colorId === color.id ? "✓" : ""}</span><span>{color.name}</span></> : <><span className={`h-7 w-7 rounded-full border border-black/10 shadow-sm ${item.colorId === color.id ? "ring-2 ring-teal-600 ring-offset-2" : ""}`} style={{ backgroundColor: color.hex_code && /^#[0-9a-fA-F]{6}$/.test(color.hex_code) ? color.hex_code : fallbackColor(color.name) }} /><span>{color.name}</span></>}
                     </button>)}
                   </div></div></fieldset> : null}
-                  {materials.length > 0 ? <label className="grid gap-1 text-xs text-muted">الخامة
-                    <select aria-label={`خامة ${item.name}`} value={materials.some((material) => material.id === item.materialId) ? item.materialId ?? "" : ""} onChange={(event) => {
-                      const option = materials.find((material) => material.id === event.target.value);
+                  {materials.length > 0 ? <label className="grid min-w-0 gap-1 text-xs text-muted">الخامة
+                    <StorefrontSelect ariaLabel={`خامة ${item.name}`} value={materials.some((material) => material.id === item.materialId) ? item.materialId ?? "" : ""} onChange={(materialId) => {
+                      const option = materials.find((material) => material.id === materialId);
                       if (option) setVariant(item.productId, item.colorId, item.materialId, item.colorId, item.colorName, option.id, option.name);
-                    }} className="min-h-10 rounded-lg border border-border bg-white px-2 text-sm text-text">
-                      {materials.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}
-                    </select>
+                    }} options={materials.map((material) => ({ value: material.id, label: material.name }))} triggerClassName="min-h-10 w-full rounded-lg border border-border bg-white px-2 text-sm" />
                   </label> : null}
                 </div> : null}
               </div>

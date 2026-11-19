@@ -35,7 +35,7 @@ export function StoreHeader({
         <div className="order-2 flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5 xl:order-1">
           <MobileNavMenu items={NAV} storeName={storeName} categories={categories} />
           <Link href="/" aria-label={`الصفحة الرئيسية — ${storeName}`} className="flex min-w-0 shrink-0 translate-x-[21px] items-center gap-2 text-sm font-bold tracking-tight text-navy sm:text-lg xl:translate-x-0">
-            {logoUrl ? <span className="flex h-9 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-14"><Image src={logoUrl} alt="" width={160} height={64} unoptimized className="max-h-full max-w-full object-contain" /></span> : null}
+            {logoUrl ? <span className="flex h-9 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-14"><Image src={logoUrl} alt="" width={160} height={64} unoptimized className="max-h-full max-w-full scale-[1.5] object-contain" /></span> : null}
             <span className="max-w-[8.5rem] truncate sm:max-w-56">{storeName}</span>
           </Link>
         </div>

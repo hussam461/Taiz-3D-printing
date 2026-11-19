@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, type CartItem } from "@/components/storefront/cart-provider";
+import { StorefrontSelect } from "@/components/storefront/storefront-select";
 import { discardCheckoutProof, submitCheckoutAction, uploadCheckoutProof } from "@/lib/orders/actions";
 import {
   amountInPaymentCurrency,
@@ -201,21 +202,19 @@ export function CheckoutForm({
         </section>
         <section className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-6">
           <StepHeading number="2" title="عنوان التوصيل" />
-          <label className="mt-3 block text-sm">
-            المحافظة
-            <select
+          <div className="mt-3 block text-sm">
+            <span>المحافظة</span>
+            <StorefrontSelect
+              ariaLabel="المحافظة"
               value={areaId}
-              onChange={(e) => setAreaId(e.target.value)}
-              className="mt-1.5 min-h-14 w-full rounded-lg border border-border bg-white px-3 text-sm"
-            >
-              {areas.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.governorate}
-                  {row.city_area ? ` — ${row.city_area}` : ""} ({Number(row.fee_old_yer) === 0 ? "التوصيل مجاني" : formatCheckoutMoney(amountInPaymentCurrency(Number(row.fee_old_yer), currency, newRialPerOldRial), currency)})
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setAreaId}
+              options={areas.map((row) => ({
+                value: row.id,
+                label: `${row.governorate}${row.city_area ? ` — ${row.city_area}` : ""} (${Number(row.fee_old_yer) === 0 ? "التوصيل مجاني" : formatCheckoutMoney(amountInPaymentCurrency(Number(row.fee_old_yer), currency, newRialPerOldRial), currency)})`,
+              }))}
+              triggerClassName="mt-1.5 min-h-14 w-full rounded-lg border border-border bg-white px-3 text-sm"
+            />
+          </div>
           <label className="mt-3 block text-sm">
             العنوان التفصيلي
             <textarea name="address" required autoComplete="street-address" rows={2} className="mt-1.5 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm" />
@@ -275,27 +274,31 @@ export function CheckoutForm({
             <div className="mt-4 rounded-xl border border-border bg-slate-50 p-3 sm:p-4">
               <p className="mb-2 text-sm font-semibold text-text">حساب التحويل</p>
               <div className="flex min-w-0 items-center gap-2">
-                <label className="min-w-0 flex-1">
-                  <span className="sr-only">اختر حساب التحويل</span>
-                  <select
-                    value={selectedAccount?.id}
-                    onChange={(e) => setAccountId(e.target.value)}
-                    className="min-h-12 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm"
-                  >
-                    {compatibleAccounts.map((row) => (
-                      <option key={row.id} value={row.id}>
-                        {row.name} — {row.account_number}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="min-w-0 flex-1">
+                  {compatibleAccounts.length > 1 ? (
+                    <>
+                      <span className="sr-only">اختر حساب التحويل</span>
+                      <StorefrontSelect
+                        ariaLabel="اختر حساب التحويل"
+                        value={selectedAccount?.id ?? ""}
+                        onChange={setAccountId}
+                        options={compatibleAccounts.map((row) => ({ value: row.id, label: `${row.name} — ${row.account_number}` }))}
+                        triggerClassName="min-h-12 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm"
+                      />
+                    </>
+                  ) : (
+                    <div className="min-w-0 flex-1 py-1 text-sm text-text">
+                      <p className="truncate font-semibold">{selectedAccount?.name ?? ""}</p>
+                      <p dir="ltr" className="truncate text-start text-muted">{selectedAccount?.account_number ?? ""}</p>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   disabled={!selectedAccount}
-                  aria-live="polite"
-                  aria-label={copied ? "تم نسخ رقم الحساب" : "نسخ رقم الحساب المحدد"}
-                  title={copied ? "تم نسخ رقم الحساب" : "نسخ رقم الحساب المحدد"}
-                  className={`inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${copied ? "border-emerald-600 bg-emerald-600 text-white" : "border-primary/25 bg-white text-primary hover:bg-primary/5"}`}
+                  aria-label="نسخ رقم الحساب المحدد"
+                  title="نسخ رقم الحساب"
+                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${copied ? "border-emerald-600 bg-emerald-600 text-white" : "border-primary/25 bg-white text-primary hover:bg-primary/5"}`}
                   onClick={async () => {
                     if (!selectedAccount) return;
                     await navigator.clipboard.writeText(selectedAccount.account_number);
@@ -308,9 +311,9 @@ export function CheckoutForm({
                   }}
                 >
                   {copied ? (
-                    <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="m5 12 4.5 4.5L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>تم النسخ</span></>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="m5 12 4.5 4.5L19 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   ) : (
-                    <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg><span>نسخ</span></>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
                   )}
                 </button>
               </div>
