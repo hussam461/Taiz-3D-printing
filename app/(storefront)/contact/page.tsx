@@ -47,7 +47,7 @@ export default async function ContactPage() {
 
     {hasContact ? <section aria-label="طرق التواصل" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {phoneDigits ? <ContactCard kind="phone" title="اتصال هاتفي" href={`tel:${phoneDigits}`} action="اتصل بنا" /> : null}
-      {whatsappDigits ? <ContactCard kind="whatsapp" title="واتساب" href={`https://wa.me/${whatsappDigits}`} action="راسلنا" external /> : null}
+      {whatsappDigits ? <ContactCard kind="whatsapp" title="واتساب" href={`https://wa.me/${whatsappDigits}?text=${encodeURIComponent(contact.whatsapp_message || "السلام عليكم، أريد الاستفسار عن منتجاتكم.")}`} action="راسلنا" external /> : null}
       {contact.instagram ? <ContactCard kind="instagram" title="إنستغرام" href={contact.instagram} action="تابع حسابنا" external /> : null}
       {contact.email ? <ContactCard kind="email" title="البريد الإلكتروني" href={`mailto:${contact.email}`} action="راسلنا بالبريد" /> : null}
     </section> : <section className="rounded-2xl border border-dashed border-border bg-white px-5 py-12 text-center shadow-sm"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-muted"><ContactIcon kind="email" /></span><h2 className="mt-4 font-semibold">قنوات التواصل غير متاحة حاليًا</h2><p className="mt-2 text-sm leading-6 text-muted">ستظهر معلومات التواصل هنا عند إضافتها من إدارة المتجر.</p></section>}

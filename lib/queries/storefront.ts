@@ -4,6 +4,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import { cachePublicQuery } from "@/lib/queries/public-cache";
 
+const DEFAULT_GENERAL_WHATSAPP_MESSAGE = "السلام عليكم، أريد الاستفسار عن منتجاتكم.";
+
 export type Category = {
   id: string;
   name: string;
@@ -158,7 +160,14 @@ const getCachedStorefrontContext = cachePublicQuery("storefront-context", async 
       deposit_percent: 30,
       ...(store ?? {}),
     },
-    contact: contact ?? { phone: null, whatsapp: null, instagram: null, email: null },
+    contact: {
+      phone: null,
+      whatsapp: null,
+      instagram: null,
+      email: null,
+      whatsapp_message: DEFAULT_GENERAL_WHATSAPP_MESSAGE,
+      ...(contact ?? {}),
+    },
     configured: true,
   };
 });
@@ -182,7 +191,13 @@ export async function getStorefrontContext() {
         announcement_button_enabled: true,
         deposit_percent: 30,
       },
-      contact: { phone: null as string | null, whatsapp: null as string | null, instagram: null as string | null, email: null as string | null },
+      contact: {
+        phone: null as string | null,
+        whatsapp: null as string | null,
+        instagram: null as string | null,
+        email: null as string | null,
+        whatsapp_message: DEFAULT_GENERAL_WHATSAPP_MESSAGE,
+      },
       configured: false,
     };
   }

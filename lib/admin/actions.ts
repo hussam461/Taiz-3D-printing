@@ -1198,10 +1198,13 @@ export async function deleteHomepageSlide(id: string) {
 export async function saveContactSettings(formData: FormData) {
   await requireAdmin();
   const supabase = await createServerSupabase();
+  const whatsappMessage = String(formData.get("whatsapp_message") ?? "").trim();
+  if (whatsappMessage.length > 500) return { ok: false as const, error: "رسالة واتساب العامة يجب ألا تتجاوز 500 حرف" };
   const { error } = await supabase.from("contact_settings").upsert({
     id: 1,
     phone: String(formData.get("phone") ?? "") || null,
     whatsapp: String(formData.get("whatsapp") ?? "") || null,
+    whatsapp_message: whatsappMessage || "السلام عليكم، أريد الاستفسار عن منتجاتكم.",
     instagram: String(formData.get("instagram") ?? "") || null,
     email: String(formData.get("email") ?? "") || null,
     updated_at: new Date().toISOString(),

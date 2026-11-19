@@ -32,7 +32,7 @@ export function StoreHeader({
       <AnnouncementBar {...announcement} />
       <div className="mx-auto flex min-h-[4.25rem] w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-6 lg:px-8 xl:h-[4.75rem] xl:flex-nowrap xl:py-0">
         <StoreSearchForm />
-        <div className="order-2 flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5 xl:order-1">
+        <div className="order-2 flex min-w-0 shrink-0 items-center gap-[11px] sm:gap-[13px] xl:order-1">
           <MobileNavMenu items={NAV} storeName={storeName} categories={categories} />
           <Link href="/" aria-label={`الصفحة الرئيسية — ${storeName}`} className="flex min-w-0 shrink-0 translate-x-[21px] items-center gap-2 text-sm font-bold tracking-tight text-navy sm:text-lg xl:translate-x-0">
             {logoUrl ? <span className="flex h-9 w-10 shrink-0 items-center justify-center sm:h-11 sm:w-14"><Image src={logoUrl} alt="" width={160} height={64} unoptimized className="max-h-full max-w-full scale-[1.5] object-contain" /></span> : null}
@@ -53,6 +53,7 @@ export function StoreFooter({
   description,
   phone,
   whatsapp,
+  whatsappMessage,
   instagram,
   email,
 }: {
@@ -60,6 +61,7 @@ export function StoreFooter({
   description: string;
   phone: string | null;
   whatsapp: string | null;
+  whatsappMessage: string;
   instagram: string | null;
   email: string | null;
 }) {
@@ -87,7 +89,7 @@ export function StoreFooter({
           <h2 className="text-sm font-semibold">تواصل معنا</h2>
           <ul className="mt-4 space-y-3 text-sm text-white/75">
             {phone ? <li><a className="inline-flex min-h-9 items-center gap-2 transition hover:text-white focus-visible:outline-white" href={`tel:${phone.replace(/[^\d+]/g, "")}`}><ContactIcon kind="phone" /><span>اتصل بنا</span></a></li> : null}
-            {whatsapp ? <li><a className="inline-flex min-h-9 items-center gap-2 transition hover:text-white focus-visible:outline-white" href={`https://wa.me/${whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"><ContactIcon kind="whatsapp" /><span>راسلنا عبر واتساب</span></a></li> : null}
+            {whatsapp ? <li><a className="inline-flex min-h-9 items-center gap-2 transition hover:text-white focus-visible:outline-white" href={`https://wa.me/${whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noreferrer"><ContactIcon kind="whatsapp" /><span>راسلنا عبر واتساب</span></a></li> : null}
             {instagram ? <li><a className="inline-flex min-h-9 items-center gap-2 transition hover:text-white focus-visible:outline-white" href={instagram} target="_blank" rel="noreferrer"><ContactIcon kind="instagram" /><span>تابعنا على إنستغرام</span></a></li> : null}
             {email ? <li><a className="inline-flex min-h-9 items-center gap-2 transition hover:text-white focus-visible:outline-white" href={`mailto:${email}`}><ContactIcon kind="email" /><span>راسلنا بالبريد</span></a></li> : null}
             {!phone && !whatsapp && !instagram && !email ? <li className="text-white/55">بيانات التواصل ستظهر هنا.</li> : null}

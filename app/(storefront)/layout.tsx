@@ -26,6 +26,7 @@ export default async function StorefrontLayout({
           description={store.description}
           phone={contact.phone}
           whatsapp={contact.whatsapp}
+          whatsappMessage={contact.whatsapp_message}
           instagram={contact.instagram}
           email={contact.email}
         />

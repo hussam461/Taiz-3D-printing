@@ -260,6 +260,7 @@ create table if not exists public.contact_settings (
   id smallint primary key default 1 check (id = 1),
   phone text,
   whatsapp text,
+  whatsapp_message text not null default 'السلام عليكم، أريد الاستفسار عن منتجاتكم.',
   instagram text,
   email text,
   updated_at timestamptz not null default now()
