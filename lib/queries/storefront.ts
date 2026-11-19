@@ -452,39 +452,59 @@ export async function getMaterials() {
   catch (error) { console.error("Active materials could not be loaded", { error }); return []; }
 }
 
-export async function getDeliveryAreas() {
-  const supabase = await db();
-  if (!supabase) return [];
-  const { data } = await supabase
+const getCachedDeliveryAreas = cachePublicQuery("delivery-areas", async (supabase) => {
+  const { data, error } = await supabase
     .from("delivery_areas")
-    .select("*")
+    .select("id, governorate, city_area, fee_old_yer, is_default")
     .eq("is_active", true)
     .order("sort_order");
+  if (error) throw error;
   return data ?? [];
+});
+
+export async function getDeliveryAreas() {
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedDeliveryAreas(); }
+  catch (error) { console.error("Active delivery areas could not be loaded", { error }); return []; }
 }
+
+const getCachedPaymentAccounts = cachePublicQuery("payment-accounts", async (supabase, currency?: "OLD_YER" | "NEW_YER") => {
+  let request = supabase
+    .from("payment_accounts")
+    .select("id, name, account_number, currency_code, instructions")
+    .eq("is_active", true)
+    .order("sort_order");
+  if (currency) request = request.eq("currency_code", currency);
+  const { data, error } = await request;
+  if (error) throw error;
+  return data ?? [];
+});
 
 export async function getPaymentAccounts(currency?: "OLD_YER" | "NEW_YER") {
-  const supabase = await db();
-  if (!supabase) return [];
-  let request = supabase.from("payment_accounts").select("*").eq("is_active", true).order("sort_order");
-  if (currency) request = request.eq("currency_code", currency);
-  const { data } = await request;
-  return data ?? [];
+  if (!isSupabaseConfigured()) return [];
+  try { return await getCachedPaymentAccounts(currency); }
+  catch (error) { console.error("Active payment accounts could not be loaded", { error }); return []; }
 }
 
-export async function getCheckoutConfig() {
-  const supabase = await db();
-  if (!supabase) return null;
-  const [{ data: freeDelivery }, { data: rate }, { data: store }] = await Promise.all([
-    supabase.from("free_delivery_settings").select("*").eq("id", 1).maybeSingle(),
-    supabase.from("exchange_rates").select("*").order("created_at", { ascending: false }).limit(1),
+const getCachedCheckoutConfig = cachePublicQuery("checkout-config", async (supabase) => {
+  const [freeResult, rateResult, storeResult] = await Promise.all([
+    supabase.from("free_delivery_settings").select("is_enabled, min_order_value_old_yer").eq("id", 1).maybeSingle(),
+    supabase.from("exchange_rates").select("new_rial_per_old_rial, created_at").order("created_at", { ascending: false }).limit(1),
     supabase.from("store_settings").select("deposit_percent").eq("id", 1).maybeSingle(),
   ]);
+  const error = freeResult.error ?? rateResult.error ?? storeResult.error;
+  if (error) throw error;
   return {
-    freeDelivery: freeDelivery ?? { is_enabled: false, min_order_value_old_yer: 0 },
-    exchange: rate?.[0] ?? { new_rial_per_old_rial: 1 },
-    depositPercent: Number(store?.deposit_percent ?? 30),
+    freeDelivery: freeResult.data ?? { is_enabled: false, min_order_value_old_yer: 0 },
+    exchange: rateResult.data?.[0] ?? { new_rial_per_old_rial: 1 },
+    depositPercent: Number(storeResult.data?.deposit_percent ?? 30),
   };
+});
+
+export async function getCheckoutConfig() {
+  if (!isSupabaseConfigured()) return null;
+  try { return await getCachedCheckoutConfig(); }
+  catch (error) { console.error("Checkout configuration could not be loaded", { error }); return null; }
 }
 
 const getCachedFaq = cachePublicQuery("faq", async (supabase) => {

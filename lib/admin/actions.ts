@@ -890,6 +890,7 @@ export async function saveFreeDelivery(formData: FormData) {
   });
   if (error) return { ok: false as const, error: "تعذر حفظ إعداد التوصيل المجاني" };
   revalidatePath("/admin/offers");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
@@ -904,6 +905,7 @@ export async function saveExchangeRate(formData: FormData) {
   });
   if (error) return { ok: false as const, error: "تعذر حفظ سعر التحويل" };
   revalidatePath("/admin/currencies");
+  refreshPublicStorefrontData();
   return { ok: true as const };
 }
 
