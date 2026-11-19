@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import type { Category } from "@/lib/queries/storefront";
 
 type NavItem = { href: string; label: string };
+const subscribeToNothing = () => () => {};
+const getMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
 
 function NavIcon({ href }: { href: string }) {
   const common = "h-5 w-5";
@@ -21,8 +25,10 @@ function NavIcon({ href }: { href: string }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={common}><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" /><path d="M9.5 9a2.6 2.6 0 1 1 4.4 1.9c-1.2 1-1.9 1.4-1.9 3M12 17.3v.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>;
 }
 
-export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeName: string }) {
+export function MobileNavMenu({ items, storeName, categories }: { items: NavItem[]; storeName: string; categories: Category[] }) {
   const [open, setOpen] = useState(false);
+  const mounted = useSyncExternalStore(subscribeToNothing, getMountedSnapshot, getServerMountedSnapshot);
+  const [productsExpanded, setProductsExpanded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -31,6 +37,7 @@ export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeNam
 
   useEffect(() => {
     if (!open) return;
+    const trigger = triggerRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     firstLinkRef.current?.focus();
@@ -51,6 +58,7 @@ export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeNam
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", closeOnEscape);
+      trigger?.focus();
     };
   }, [open]);
 
@@ -63,7 +71,7 @@ export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeNam
         aria-expanded={open}
         aria-controls="store-mobile-navigation"
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-border bg-white text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="inline-flex h-11 w-11 cursor-pointer items-center justify-center text-navy transition-colors hover:text-teal-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         {open ? (
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
@@ -71,10 +79,10 @@ export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeNam
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
         )}
       </button>
-      {open ? createPortal(
+      {mounted ? createPortal(
         <>
-          <button type="button" aria-label="إغلاق القائمة" onClick={() => setOpen(false)} className="fixed inset-0 z-[100] cursor-default bg-navy/35 backdrop-blur-[2px]" />
-          <div ref={drawerRef} id="store-mobile-navigation" role="dialog" aria-modal="true" aria-label={`قائمة ${storeName}`} onKeyDown={(event) => {
+          <button type="button" aria-label="إغلاق القائمة" aria-hidden={!open} tabIndex={open ? 0 : -1} disabled={!open} onClick={() => setOpen(false)} className={`fixed inset-0 z-[100] cursor-default bg-navy/35 backdrop-blur-[2px] transition-opacity duration-300 ease-out motion-reduce:transition-none ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+          <div ref={drawerRef} id="store-mobile-navigation" role="dialog" aria-modal={open ? true : undefined} aria-hidden={!open} inert={!open} aria-label={`قائمة ${storeName}`} onKeyDown={(event) => {
             if (event.key !== "Tab") return;
             const focusable = drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
             if (!focusable?.length) return;
@@ -82,7 +90,7 @@ export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeNam
             const last = focusable[focusable.length - 1];
             if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
             else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-          }} className="fixed inset-y-0 end-0 z-[101] flex w-[min(22rem,90vw)] flex-col border-s border-border bg-white shadow-2xl">
+          }} className={`fixed inset-y-0 right-0 z-[101] flex w-[min(22rem,90vw)] flex-col border-l border-border bg-white shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${open ? "translate-x-0" : "pointer-events-none translate-x-full"}`}>
             <div className="flex min-h-[5.5rem] items-center justify-between border-b border-border bg-gradient-to-l from-primary/[0.07] via-white to-white px-5">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-sm">
@@ -99,6 +107,34 @@ export function MobileNavMenu({ items, storeName }: { items: NavItem[]; storeNam
               <div className="space-y-1.5">
               {items.map((item, index) => {
                 const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                if (item.href === "/products" && categories.length) {
+                  return (
+                    <div key={item.href}>
+                      <button
+                        type="button"
+                        aria-expanded={productsExpanded}
+                        aria-controls="store-mobile-product-categories"
+                        onClick={() => setProductsExpanded((value) => !value)}
+                        className={`group flex min-h-[3.35rem] w-full items-center justify-between rounded-2xl border px-3.5 text-sm transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-primary/15 bg-primary/[0.08] font-bold text-primary shadow-sm" : "border-transparent font-medium text-text hover:border-border hover:bg-slate-50"}`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${active ? "bg-white text-primary" : "bg-slate-50 text-muted group-hover:bg-white group-hover:text-primary"}`}><NavIcon href={item.href} /></span>
+                          <span>{item.label}</span>
+                        </span>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={`h-4 w-4 text-muted transition-transform ${productsExpanded ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                      {productsExpanded ? (
+                        <div id="store-mobile-product-categories" className="ms-6 mt-1 space-y-1 border-s-2 border-primary/15 ps-3">
+                          {categories.map((category) => (
+                            <Link key={category.id} href={`/products?category=${encodeURIComponent(category.slug)}`} onClick={() => { setProductsExpanded(false); setOpen(false); }} className="flex min-h-10 items-center rounded-xl px-3 text-sm text-text transition hover:bg-slate-50 hover:text-primary">
+                              {category.name}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }
                 return (
                   <Link
                     key={item.href}

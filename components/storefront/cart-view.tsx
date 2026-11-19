@@ -94,7 +94,10 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
                 <QuantityStepper quantity={item.quantity} onChange={(value) => setQuantity(item.productId, item.colorId, item.materialId, value)} className="w-32 sm:w-36" />
               </div>
               <div className="col-start-2 row-start-2 flex min-w-0 max-w-full items-center justify-self-end border-b border-border pb-2 text-left sm:col-start-3 sm:row-start-2 sm:max-w-56 sm:items-start sm:border-0 sm:pb-0">
-                <span className="max-w-full break-words text-[11px] font-semibold leading-4 text-teal-700 sm:text-xs">المجموع: {formatOldYer(Math.round(item.basePriceOldYer * (1 - (item.discountPercent ?? 0) / 100)) * item.quantity)}</span>
+                <span className="flex max-w-full flex-wrap items-baseline gap-x-1 text-teal-700">
+                  <span className="text-sm font-semibold leading-5 sm:text-base">المجموع: {formatIntegerWestern(Math.round(item.basePriceOldYer * (1 - (item.discountPercent ?? 0) / 100)) * item.quantity)}</span>
+                  <span className="text-[11px] font-semibold leading-4 sm:text-xs">ر.ي قديم</span>
+                </span>
               </div>
             </li>
           );

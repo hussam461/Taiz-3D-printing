@@ -3,6 +3,17 @@
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef } from "react";
 
+const FOOTER_CONTENT_PATHS = new Set([
+  "/faq",
+  "/terms",
+  "/privacy",
+  "/payment-policy",
+  "/delivery-policy",
+  "/custom-orders-policy",
+  "/refund-policy",
+]);
+const FOOTER_BACK_SCROLL_KEY = "taiz-footer-back-to-top";
+
 export function NavigationScroll() {
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
@@ -41,9 +52,25 @@ export function NavigationScroll() {
 
     if (historyPathname.current === pathname) {
       historyPathname.current = null;
+      let returnToTop = false;
+      try {
+        returnToTop = sessionStorage.getItem(FOOTER_BACK_SCROLL_KEY) === "1";
+        if (returnToTop) sessionStorage.removeItem(FOOTER_BACK_SCROLL_KEY);
+      } catch { /* Storage may be unavailable. */ }
+      if (returnToTop) {
+        window.scrollTo({ top: 0, behavior: "instant" });
+        window.setTimeout(() => { window.history.scrollRestoration = "auto"; }, 150);
+      }
       return;
     }
     historyPathname.current = null;
+    try {
+      const footerBackModeActive = sessionStorage.getItem(FOOTER_BACK_SCROLL_KEY) === "1";
+      if (!footerBackModeActive || !FOOTER_CONTENT_PATHS.has(pathname)) {
+        sessionStorage.removeItem(FOOTER_BACK_SCROLL_KEY);
+        window.history.scrollRestoration = "auto";
+      }
+    } catch { /* Storage may be unavailable. */ }
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [pathname]);
 
