@@ -9,6 +9,7 @@ import { formatOldYer } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import type { Specification } from "@/types/domain";
 import Image from "next/image";
+import { Suspense } from "react";
 import { productDescriptionToText, sanitizeProductDescriptionMarkup } from "@/lib/validation/product";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -39,16 +40,12 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [product, colors, materials, featured] = await Promise.all([
+  const [product, colors, materials] = await Promise.all([
     getProductBySlug(slug),
     getColors(),
     getMaterials(),
-    getFeaturedProducts(),
   ]);
   if (!product) notFound();
-  const [related] = await Promise.all([
-    product.categories?.slug ? getRelatedProducts(product.categories.slug, product.id) : Promise.resolve([]),
-  ]);
 
   const priced = discountedUnitPrice({
     basePriceOldYer: Number(product.base_price_old_yer),
@@ -150,9 +147,60 @@ export default async function ProductPage({
         />
       </div>
       </div>
-      {related.length ? <ProductsCarousel products={related} defaultColor={colors.find((color) => color.is_default) ?? colors[0] ?? null} defaultMaterial={materials.find((material) => material.is_default) ?? materials[0] ?? null} heading="منتجات مشابهة" headingId="related-products-heading" viewAllHref={`/products?category=${encodeURIComponent(product.categories?.slug ?? "")}`} /> : null}
-      {featured.filter((item) => item.id !== product.id).length ? <ProductsCarousel products={featured.filter((item) => item.id !== product.id)} defaultColor={colors.find((color) => color.is_default) ?? colors[0] ?? null} defaultMaterial={materials.find((material) => material.is_default) ?? materials[0] ?? null} heading="منتجات قد تعجبك" headingId="recommended-products-heading" viewAllHref="/products?featured=1" /> : null}
+      <Suspense fallback={null}>
+        <RelatedProductsSection
+          productId={product.id}
+          categorySlug={product.categories?.slug ?? null}
+          colors={colors}
+          materials={materials}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <FeaturedProductsSection
+          productId={product.id}
+          colors={colors}
+          materials={materials}
+        />
+      </Suspense>
     </div>
     </>
   );
+}
+
+async function RelatedProductsSection({
+  productId,
+  categorySlug,
+  colors,
+  materials,
+}: {
+  productId: string;
+  categorySlug: string | null;
+  colors: Awaited<ReturnType<typeof getColors>>;
+  materials: Awaited<ReturnType<typeof getMaterials>>;
+}) {
+  if (!categorySlug) return null;
+  const related = await getRelatedProducts(categorySlug, productId);
+  if (!related.length) return null;
+  const defaultColor = colors.find((color) => color.is_default) ?? colors[0] ?? null;
+  const defaultMaterial = materials.find((material) => material.is_default) ?? materials[0] ?? null;
+
+  return <ProductsCarousel products={related} defaultColor={defaultColor} defaultMaterial={defaultMaterial} heading="منتجات مشابهة" headingId="related-products-heading" viewAllHref={`/products?category=${encodeURIComponent(categorySlug)}`} />;
+}
+
+async function FeaturedProductsSection({
+  productId,
+  colors,
+  materials,
+}: {
+  productId: string;
+  colors: Awaited<ReturnType<typeof getColors>>;
+  materials: Awaited<ReturnType<typeof getMaterials>>;
+}) {
+  const featured = await getFeaturedProducts();
+  const recommended = featured.filter((item) => item.id !== productId);
+  if (!recommended.length) return null;
+  const defaultColor = colors.find((color) => color.is_default) ?? colors[0] ?? null;
+  const defaultMaterial = materials.find((material) => material.is_default) ?? materials[0] ?? null;
+
+  return <ProductsCarousel products={recommended} defaultColor={defaultColor} defaultMaterial={defaultMaterial} heading="منتجات قد تعجبك" headingId="recommended-products-heading" viewAllHref="/products?featured=1" />;
 }

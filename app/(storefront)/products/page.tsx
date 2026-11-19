@@ -25,17 +25,19 @@ export default async function ProductsPage({
   }>;
 }) {
   const params = await searchParams;
-  const rateLimit = await checkPublicRateLimit("productSearch", await headers());
-  if (!rateLimit.allowed) {
-    return (
-      <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-7 text-amber-950">
-        <p>{publicRateLimitError(rateLimit.reason)}</p>
-        <Link href="/" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-white px-4 font-semibold text-primary shadow-sm">العودة للرئيسية</Link>
-      </div>
-    );
+  const queryText = params.storefrontSearch ?? params.q;
+  if (queryText?.trim()) {
+    const rateLimit = await checkPublicRateLimit("productSearch", await headers());
+    if (!rateLimit.allowed) {
+      return (
+        <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-7 text-amber-950">
+          <p>{publicRateLimitError(rateLimit.reason)}</p>
+          <Link href="/" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-white px-4 font-semibold text-primary shadow-sm">العودة للرئيسية</Link>
+        </div>
+      );
+    }
   }
   const sectionLabel = params.featured === "1" ? "مميزة" : null;
-  const queryText = params.storefrontSearch ?? params.q;
   const filterParams = { ...params, q: queryText };
   const sort = (params.sort as "newest" | "price_asc" | "price_desc" | "relevance") ?? undefined;
   const [result, colors, materials, categories] = await Promise.all([
