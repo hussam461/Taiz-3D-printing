@@ -5,6 +5,7 @@ import { getActiveCategories, getStorefrontContext } from "@/lib/queries/storefr
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import { StoreBreadcrumbs } from "@/components/storefront/store-breadcrumbs";
 import { NavigationScroll } from "@/components/storefront/navigation-scroll";
+import { ServiceWorkerRegistration } from "@/components/storefront/service-worker-registration";
 
 export default async function StorefrontLayout({
   children,
@@ -16,6 +17,7 @@ export default async function StorefrontLayout({
     <CartProvider>
       <div className="storefront-shell flex min-h-full flex-1 flex-col">
         <NavigationScroll />
+        <ServiceWorkerRegistration />
         <StoreHeader storeName={store.store_name} logoUrl={publicMediaUrl(store.logo_path, "store-assets")} categories={categories} cartSlot={<CartLink />} announcement={{ enabled: store.announcement_enabled, text: store.announcement_text, buttonLabel: store.announcement_button_label, href: store.announcement_href, scope: store.announcement_scope === "home" ? "home" : "all", buttonEnabled: store.announcement_button_enabled !== false }} />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
           <StoreBreadcrumbs />
