@@ -2,42 +2,29 @@
 
 import { useEffect } from "react";
 
-export function ServiceWorkerRegistration() {
+/** Updates any previously installed offline worker to the removal script. */
+export function ServiceWorkerCleanup() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    if (process.env.NODE_ENV !== "production" || !navigator.onLine || !("serviceWorker" in navigator)) return;
 
-    let disposed = false;
-    const onControllerChange = () => {
-      const controller = navigator.serviceWorker.controller;
-      if (!controller) return;
+    const cleanup = async () => {
+      const workerUrl = new URL("/sw.js", window.location.origin).href;
+      const registrations = await navigator.serviceWorker.getRegistrations();
 
-      const channel = new MessageChannel();
-      channel.port1.onmessage = (event: MessageEvent<{ version?: string }>) => {
-        channel.port1.close();
-        if (disposed || typeof event.data?.version !== "string") return;
+      for (const registration of registrations) {
+        const workers = [registration.active, registration.waiting, registration.installing];
+        if (!workers.some((worker) => worker?.scriptURL === workerUrl)) continue;
 
-        try {
-          if (sessionStorage.getItem("taiz-offline-sw-version") === event.data.version) return;
-          sessionStorage.setItem("taiz-offline-sw-version", event.data.version);
-          window.location.reload();
-        } catch {
-          // Keep the current page if browser storage is unavailable.
-        }
-      };
-      controller.postMessage({ type: "GET_VERSION" }, [channel.port2]);
+        // /sw.js is now a one-time removal worker. It deletes its old caches and
+        // unregisters itself once activated. Keep retrying on later visits if
+        // the browser cannot reach the updated script this time.
+        await registration.update();
+      }
     };
 
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-    navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch((error) => {
-      console.error("Could not register storefront offline support", error);
+    void cleanup().catch(() => {
+      // A failed background cleanup must not interfere with online browsing.
     });
-
-    if (navigator.serviceWorker.controller) onControllerChange();
-
-    return () => {
-      disposed = true;
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-    };
   }, []);
 
   return null;

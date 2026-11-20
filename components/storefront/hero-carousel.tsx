@@ -168,7 +168,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
           if (!isActive && !isPrevious) return null;
           return (
             <div key={item.id} className={`absolute inset-0 ${isActive ? `z-20 opacity-100 ${previousIndex !== null && !prefersReducedMotion ? "hero-slide-enter" : ""}` : "z-10 opacity-100"}`}>
-              <Image src={item.image_url} alt="" fill sizes="100vw" unoptimized aria-hidden="true" className="scale-110 object-cover object-center opacity-60 blur-2xl" />
+              <Image src={item.image_url} alt="" fill sizes="100vw" unoptimized loading={isActive ? "eager" : "lazy"} aria-hidden="true" className="scale-110 object-cover object-center opacity-60 blur-2xl" />
               <Image src={item.image_url} alt="" fill priority={isActive && activeIndex === 0} sizes="100vw" unoptimized onLoad={() => {
                 loadedHeroImages.current.add(item.image_url);
                 if (activeImageUrlRef.current === item.image_url) setLoadingPlaceholderUrl(null);
