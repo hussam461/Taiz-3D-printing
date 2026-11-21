@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { checkPublicRateLimit, publicRateLimitError } from "@/lib/security/public-rate-limit";
 import { hasValidPaymentProofSignature } from "@/lib/validation/payment-proof";
 import { ALLOWED_PROOF_TYPES, MAX_PROOF_BYTES } from "@/types/domain";
+import { getCartProductSnapshots } from "@/lib/queries/storefront";
 
 const stagingPathPattern = /^checkout-staging\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/i;
 const proofExtensions: Record<string, string> = {
@@ -14,6 +15,21 @@ const proofExtensions: Record<string, string> = {
   "image/webp": "webp",
   "application/pdf": "pdf",
 };
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function refreshCartProductSnapshotsAction(rawIds: unknown) {
+  if (!Array.isArray(rawIds) || rawIds.length > 50 || rawIds.some((id) => typeof id !== "string" || !uuidPattern.test(id))) {
+    return { ok: false as const, error: "تعذر التحقق من المنتجات. حدّث الصفحة وحاول مجددًا." };
+  }
+  try {
+    const products = await getCartProductSnapshots(rawIds as string[]);
+    return { ok: true as const, products };
+  } catch (error) {
+    console.error("Cart product snapshot refresh failed", { error });
+    return { ok: false as const, error: "تعذر التحقق من الأسعار الآن. تحقق من الاتصال ثم أعد المحاولة." };
+  }
+}
 
 export async function uploadCheckoutProof(formData: FormData) {
   const rateLimit = await checkPublicRateLimit("proofUpload", await headers());

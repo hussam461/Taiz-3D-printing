@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, type CartItem } from "@/components/storefront/cart-provider";
 import { StorefrontSelect } from "@/components/storefront/storefront-select";
-import { discardCheckoutProof, submitCheckoutAction, uploadCheckoutProof } from "@/lib/orders/actions";
+import { discardCheckoutProof, refreshCartProductSnapshotsAction, submitCheckoutAction, uploadCheckoutProof } from "@/lib/orders/actions";
 import {
   amountInPaymentCurrency,
   calculateOrderTotals,
@@ -53,7 +53,7 @@ export function CheckoutForm({
   freeDeliveryMin: number;
   newRialPerOldRial: number;
 }) {
-  const { items, ready, clear } = useCart();
+  const { items, ready, clear, updateProductSnapshots } = useCart();
   const [directItem, setDirectItem] = useState<CartItem | null>(null);
   const [directReady, setDirectReady] = useState(false);
   const router = useRouter();
@@ -66,6 +66,11 @@ export function CheckoutForm({
   const copyResetTimer = useRef<number | null>(null);
   const idempotencyKey = useRef<string | null>(null);
   const [proofUpload, setProofUpload] = useState<ProofUploadState>({ status: "idle" });
+  const [snapshotState, setSnapshotState] = useState<{ key: string; status: "ready" | "error" } | null>(null);
+  const [snapshotRetry, setSnapshotRetry] = useState(0);
+  const [unavailableIds, setUnavailableIds] = useState<string[]>([]);
+  const [priceReviewRequired, setPriceReviewRequired] = useState(false);
+  const [priceReviewed, setPriceReviewed] = useState(false);
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
@@ -91,6 +96,48 @@ export function CheckoutForm({
 
   const area = areas.find((row) => row.id === areaId);
   const checkoutItems = useMemo(() => directItem ? [directItem] : items, [directItem, items]);
+  const productIdsKey = [...new Set(checkoutItems.map((item) => item.productId))].sort().join(",");
+  const snapshotStatus = !productIdsKey ? "ready" : snapshotState?.key === productIdsKey ? snapshotState.status : "checking";
+  useEffect(() => {
+    if (!ready || !directReady) return;
+    if (!productIdsKey) return;
+    let active = true;
+    void refreshCartProductSnapshotsAction(productIdsKey.split(",")).then((result) => {
+      if (!active) return;
+      if (!result.ok) {
+        setSnapshotState({ key: productIdsKey, status: "error" });
+        return;
+      }
+      const byId = new Map(result.products.map((product) => [product.id, product]));
+      const changed = checkoutItems.some((item) => {
+        const latest = byId.get(item.productId);
+        return latest?.isActive && (latest.basePriceOldYer !== item.basePriceOldYer || latest.discountPercent !== item.discountPercent);
+      });
+      updateProductSnapshots(result.products);
+      if (directItem) {
+        const latest = byId.get(directItem.productId);
+        if (latest?.isActive) setDirectItem((current) => current ? {
+          ...current,
+          name: latest.name,
+          slug: latest.slug,
+          image: latest.image,
+          basePriceOldYer: latest.basePriceOldYer,
+          discountPercent: latest.discountPercent,
+        } : current);
+      }
+      const availableIds = new Set(result.products.filter((product) => product.isActive).map((product) => product.id));
+      setUnavailableIds(productIdsKey.split(",").filter((id) => !availableIds.has(id)));
+      if (changed) {
+        setPriceReviewRequired(true);
+        setPriceReviewed(false);
+        setProofUpload({ status: "idle" });
+      }
+      setSnapshotState({ key: productIdsKey, status: "ready" });
+    }).catch(() => { if (active) setSnapshotState({ key: productIdsKey, status: "error" }); });
+    return () => { active = false; };
+  // Snapshot checks run once for each set of products, not for quantity or form changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, directReady, productIdsKey, snapshotRetry, updateProductSnapshots]);
   const compatibleAccounts = accounts.filter((row) => row.currency_code === currency);
   const selectedAccount =
     compatibleAccounts.find((row) => row.id === accountId) ?? compatibleAccounts[0];
@@ -144,11 +191,21 @@ export function CheckoutForm({
           setError(proofUpload.status === "uploading" ? "انتظر حتى يكتمل رفع إثبات التحويل." : "ارفع إثبات التحويل بنجاح قبل إرسال الطلب.");
           return;
         }
+        if (snapshotStatus !== "ready" || unavailableIds.length > 0) {
+          setError(snapshotStatus === "error" ? "تعذر التحقق من المنتجات. أعد المحاولة قبل إرسال الطلب." : "انتظر حتى يكتمل التحقق من المنتجات المتاحة.");
+          return;
+        }
+        if (priceReviewRequired && !priceReviewed) {
+          setError("راجع الأسعار المحدّثة ثم أكد مراجعتها قبل الإرسال.");
+          return;
+        }
         data.set("items", JSON.stringify(checkoutItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
           colorId: item.colorId,
           materialId: item.materialId,
+          expectedBasePriceOldYer: item.basePriceOldYer,
+          expectedDiscountPercent: item.discountPercent,
         }))));
         idempotencyKey.current ??= createIdempotencyKey();
         data.set("idempotencyKey", idempotencyKey.current);
@@ -161,6 +218,21 @@ export function CheckoutForm({
           const result = await submitCheckoutAction(data);
           if (!result.ok) {
             setError(result.error);
+            if (result.products) {
+              const byId = new Map(result.products.map((product) => [product.id, product]));
+              updateProductSnapshots(result.products);
+              if (directItem) {
+                const latest = byId.get(directItem.productId);
+                if (latest?.isActive) setDirectItem((current) => current ? { ...current, name: latest.name, slug: latest.slug, image: latest.image, basePriceOldYer: latest.basePriceOldYer, discountPercent: latest.discountPercent } : current);
+              }
+              const availableIds = new Set(result.products.filter((product) => product.isActive).map((product) => product.id));
+              setUnavailableIds(productIdsKey.split(",").filter((id) => !availableIds.has(id)));
+              setSnapshotState({ key: productIdsKey, status: "ready" });
+            }
+            if (result.priceChanged) {
+              setPriceReviewRequired(true);
+              setPriceReviewed(false);
+            }
             if (result.proofMustBeReuploaded) {
               setProofUpload({ status: "error", error: "أعد رفع إثبات التحويل قبل إرسال الطلب." });
             }
@@ -226,6 +298,10 @@ export function CheckoutForm({
         </section>
         <section className="rounded-2xl border border-primary/20 bg-surface p-4 shadow-sm sm:p-6">
           <StepHeading number="3" title="راجع الطلب ومبلغ العربون" />
+          {snapshotStatus === "checking" ? <p role="status" className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-muted">جارٍ التحقق من الأسعار الحالية وتوفر المنتجات…</p> : null}
+          {snapshotStatus === "error" ? <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">تعذر التحقق من الأسعار. <button type="button" onClick={() => setSnapshotRetry((value) => value + 1)} className="underline">إعادة المحاولة</button></p> : null}
+          {unavailableIds.length > 0 ? <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">بعض المنتجات لم تعد متاحة. ارجع إلى السلة وأزلها قبل إتمام الطلب.</p> : null}
+          {priceReviewRequired ? <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><input type="checkbox" checked={priceReviewed} onChange={(event) => setPriceReviewed(event.target.checked)} className="mt-1" />تغيّر سعر منتج وتحدّث الإجمالي. راجعت المبلغ الجديد وسأحوّل المبلغ الظاهر أدناه.</label> : null}
           <p className="mt-2 text-sm leading-6 text-muted">اختر عملة الدفع لمراجعة المبلغ المطلوب قبل التحويل.</p>
           <fieldset className="mt-4">
             <legend className="mb-2 text-sm font-semibold">عملة الدفع</legend>
@@ -325,6 +401,7 @@ export function CheckoutForm({
             <input
               id="payment-proof"
               type="file"
+              disabled={snapshotStatus !== "ready" || unavailableIds.length > 0 || (priceReviewRequired && !priceReviewed)}
               accept="image/jpeg,image/png,image/webp,application/pdf"
               className="peer sr-only"
               aria-required="true"
@@ -359,7 +436,7 @@ export function CheckoutForm({
                 }
               }}
             />
-            <label htmlFor="payment-proof" className="mt-3 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-primary bg-white px-5 text-sm font-semibold text-primary transition hover:bg-blue-50 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary">
+            <label htmlFor="payment-proof" className={`mt-3 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-primary bg-white px-5 text-sm font-semibold text-primary transition hover:bg-blue-50 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary ${snapshotStatus !== "ready" || unavailableIds.length > 0 || (priceReviewRequired && !priceReviewed) ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
               {proofUpload.status === "uploading" ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-primary/25 border-t-primary" aria-hidden="true" />جاري رفع الإثبات...</> : <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15.5v2A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5v-2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>{proofUpload.path ? "استبدال صورة الإثبات" : "رفع صورة الإثبات"}</>}
             </label>
             <div id="proof-status" aria-live="polite" className="mt-2 text-sm">
@@ -369,7 +446,7 @@ export function CheckoutForm({
             </div>
           </div>
           {error ? <p role="alert" className="mt-4 rounded-xl border border-error/20 bg-red-50 p-3 text-sm text-error">{error}</p> : null}
-          <button type="submit" disabled={pending || proofUpload.status === "uploading" || !proofUpload.path || !selectedAccount} className="mt-4 min-h-12 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={pending || snapshotStatus !== "ready" || unavailableIds.length > 0 || (priceReviewRequired && !priceReviewed) || proofUpload.status === "uploading" || proofUpload.status !== "uploaded" || !selectedAccount} className="mt-4 min-h-12 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
             {pending ? "جارٍ إرسال الطلب..." : "تأكيد الطلب وإرساله"}
           </button>
         </section>

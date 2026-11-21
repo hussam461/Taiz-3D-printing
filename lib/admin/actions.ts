@@ -13,12 +13,16 @@ import { PAYMENT_CURRENCIES } from "@/types/domain";
 import { hasValidProductImageSignature, parseProductForm, productImageExtension, validateProductImageMetadata } from "@/lib/validation/product";
 import { parseDeliveryFee } from "@/lib/validation/delivery-fee";
 import { whatsappNumber } from "@/lib/formatting/whatsapp";
-import { STOREFRONT_PUBLIC_CACHE_TAG } from "@/lib/queries/public-cache";
+import { STOREFRONT_PRODUCTS_CACHE_TAG, STOREFRONT_PUBLIC_CACHE_TAG } from "@/lib/queries/public-cache";
 
 const PUBLIC_MEDIA_CACHE_CONTROL = "31536000";
 
 function refreshPublicStorefrontData() {
   updateTag(STOREFRONT_PUBLIC_CACHE_TAG);
+}
+
+function refreshPublicProductData() {
+  updateTag(STOREFRONT_PRODUCTS_CACHE_TAG);
 }
 
 async function isImageReferencedByHistoricalOrder(
@@ -516,7 +520,9 @@ export async function upsertProduct(_previousState: ProductActionState | null, f
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/admin/products");
   revalidatePath("/products");
-  refreshPublicStorefrontData();
+  revalidatePath("/");
+  revalidatePath("/products/[slug]", "page");
+  refreshPublicProductData();
   return { ok: true, productId, created };
   } catch (error) {
     const digest = (error as { digest?: string } | null)?.digest;
@@ -531,7 +537,10 @@ export async function deactivateProduct(id: string) {
   const supabase = await createServerSupabase();
   await supabase.from("products").update({ is_active: false }).eq("id", id);
   revalidatePath("/admin/products");
-  refreshPublicStorefrontData();
+  revalidatePath("/products");
+  revalidatePath("/");
+  revalidatePath("/products/[slug]", "page");
+  refreshPublicProductData();
   return { ok: true as const };
 }
 
@@ -547,7 +556,9 @@ export async function toggleProductPublication(id: string, currentlyActive: bool
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
   revalidatePath("/products");
-  refreshPublicStorefrontData();
+  revalidatePath("/");
+  revalidatePath("/products/[slug]", "page");
+  refreshPublicProductData();
   return { ok: true as const };
 }
 
@@ -608,7 +619,9 @@ export async function deleteProduct(id: string) {
   }
   if (removablePaths.length > 0) await supabase.storage.from("product-images").remove(removablePaths);
   revalidatePath("/products");
-  refreshPublicStorefrontData();
+  revalidatePath("/");
+  revalidatePath(`/products/${product.slug}`);
+  refreshPublicProductData();
   return { ok: true as const };
 }
 
@@ -754,6 +767,7 @@ export async function saveSimpleRow(table: string, formData: FormData) {
     revalidatePath("/products/[slug]", "page");
   }
   if (table === "homepage_benefits") revalidatePath("/");
+  if (table === "categories") refreshPublicProductData();
   refreshPublicStorefrontData();
   return { ok: true as const, id: savedId ?? undefined };
 }
@@ -830,6 +844,7 @@ export async function saveCategory(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath("/admin/categories");
+  refreshPublicProductData();
   refreshPublicStorefrontData();
   return { ok: true as const, id: saved.id };
 }
@@ -875,6 +890,7 @@ export async function deleteSimpleRow(table: string, id: string) {
   revalidatePath("/admin");
   revalidatePath(`/admin/${table === "delivery_areas" ? "delivery" : table === "payment_accounts" ? "payment-accounts" : table === "faq_items" ? "faq" : table === "homepage_benefits" ? "homepage-benefits" : table === "legal_pages" ? "legal-pages" : table}`);
   if (table === "homepage_benefits") revalidatePath("/");
+  if (table === "categories") refreshPublicProductData();
   refreshPublicStorefrontData();
   return { ok: true as const };
 }

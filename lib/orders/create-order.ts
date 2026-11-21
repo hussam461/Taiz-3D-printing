@@ -6,6 +6,7 @@ import {
 } from "@/lib/pricing";
 import { ALLOWED_PROOF_TYPES, MAX_PROOF_BYTES } from "@/types/domain";
 import { hasValidPaymentProofSignature } from "@/lib/validation/payment-proof";
+import type { CartProductSnapshot } from "@/lib/queries/storefront";
 
 export type CreateOrderResult =
   | {
@@ -19,7 +20,7 @@ export type CreateOrderResult =
       payableRemaining: number;
       paymentCurrency: CheckoutPayload["paymentCurrency"];
     }
-  | { ok: false; error: string; proofMustBeReuploaded?: boolean };
+  | { ok: false; error: string; proofMustBeReuploaded?: boolean; priceChanged?: boolean; products?: CartProductSnapshot[]; unavailableProductIds?: string[] };
 
 function isAllowedProof(type: string, size: number) {
   return (
@@ -74,11 +75,43 @@ export async function createOrderFromCheckout(
     .from("products")
     .select("id, name, slug, base_price_old_yer, discount_percent, is_active, product_images(storage_path, is_main)")
     .in("id", productIds);
-  if (productError || !products || products.length !== productIds.length) {
-    return { ok: false, error: "أحد المنتجات لم يعد متاحًا" };
+  if (productError || !products) return { ok: false, error: "تعذر التحقق من الأسعار الحالية. حاول مرة أخرى." };
+  const latestProducts: CartProductSnapshot[] = products.map((product) => {
+    const images = product.product_images as { storage_path: string; is_main: boolean }[] | null;
+    const main = images?.find((image) => image.is_main) ?? images?.[0];
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      image: main?.storage_path ?? null,
+      basePriceOldYer: Number(product.base_price_old_yer),
+      discountPercent: product.discount_percent == null ? null : Number(product.discount_percent),
+      isActive: Boolean(product.is_active),
+    };
+  });
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const unavailableProductIds = productIds.filter((id) => !productsById.get(id)?.is_active);
+  if (unavailableProductIds.length > 0) {
+    return {
+      ok: false,
+      error: "بعض المنتجات لم تعد متاحة. حدّث السلة قبل إرسال الطلب.",
+      products: latestProducts,
+      unavailableProductIds,
+    };
   }
-  if (products.some((product) => !product.is_active)) {
-    return { ok: false, error: "أحد المنتجات لم يعد متاحًا" };
+  const changedIds = input.items.filter((item) => {
+    const product = productsById.get(item.productId);
+    return !product || Number(product.base_price_old_yer) !== item.expectedBasePriceOldYer ||
+      (product.discount_percent == null ? null : Number(product.discount_percent)) !== item.expectedDiscountPercent;
+  }).map((item) => item.productId);
+  if (changedIds.length > 0) {
+    return {
+      ok: false,
+      error: "تغيّر سعر منتج منذ مراجعتك للطلب. راجع الأسعار الجديدة وأعد رفع إثبات التحويل.",
+      priceChanged: true,
+      products: latestProducts,
+      proofMustBeReuploaded: true,
+    };
   }
 
   const [{ data: colors }, { data: materials }, { data: area }, { data: account }, { data: store }, { data: rates }, { data: freeRow }] =
@@ -110,7 +143,7 @@ export async function createOrderFromCheckout(
     if ((materials?.length ?? 0) > 0 && (!item.materialId || !materialById.has(item.materialId))) return { ok: false, error: "اختر خامة متاحة للمنتج" };
   }
 
-  const productById = new Map(products.map((row) => [row.id, row]));
+  const productById = productsById;
   const totals = calculateOrderTotals({
     lines: input.items.map((item) => {
       const product = productById.get(item.productId)!;

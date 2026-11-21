@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/storefront/cart-provider";
 import { calculateOrderTotals } from "@/lib/pricing";
@@ -8,11 +8,44 @@ import { formatIntegerWestern, formatOldYer } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import { QuantityStepper } from "@/components/storefront/quantity-stepper";
 import { StorefrontSelect } from "@/components/storefront/storefront-select";
+import { refreshCartProductSnapshotsAction } from "@/lib/orders/actions";
 
 type CartOption = { id: string; name: string; hex_code?: string | null };
 
 export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryMin }: { colors: CartOption[]; materials: CartOption[]; freeDeliveryEnabled: boolean; freeDeliveryMin: number }) {
-  const { items, setQuantity, setVariant, removeItem, ready } = useCart();
+  const { items, setQuantity, setVariant, removeItem, ready, updateProductSnapshots } = useCart();
+  const [snapshotState, setSnapshotState] = useState<{ key: string; status: "ready" | "error" } | null>(null);
+  const [unavailableIds, setUnavailableIds] = useState<string[]>([]);
+  const [pricesWereUpdated, setPricesWereUpdated] = useState(false);
+  const [retryNumber, setRetryNumber] = useState(0);
+  const productIdsKey = [...new Set(items.map((item) => item.productId))].sort().join(",");
+  const snapshotCheck = !productIdsKey ? "ready" : snapshotState?.key === productIdsKey ? snapshotState.status : "checking";
+  useEffect(() => {
+    if (!ready) return;
+    if (!productIdsKey) return;
+    let active = true;
+    void refreshCartProductSnapshotsAction(productIdsKey.split(",")).then((result) => {
+      if (!active) return;
+      if (!result.ok) {
+        setSnapshotState({ key: productIdsKey, status: "error" });
+        return;
+      }
+      const latestById = new Map(result.products.map((product) => [product.id, product]));
+      setPricesWereUpdated(items.some((item) => {
+        const latest = latestById.get(item.productId);
+        return latest?.isActive && (latest.basePriceOldYer !== item.basePriceOldYer || latest.discountPercent !== item.discountPercent);
+      }));
+      updateProductSnapshots(result.products);
+      const availableIds = new Set(result.products.filter((product) => product.isActive).map((product) => product.id));
+      setUnavailableIds(productIdsKey.split(",").filter((id) => !availableIds.has(id)));
+      setSnapshotState({ key: productIdsKey, status: "ready" });
+    }).catch(() => { if (active) setSnapshotState({ key: productIdsKey, status: "error" }); });
+    return () => { active = false; };
+  // Check only when opening the cart or when its set of product IDs changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, productIdsKey, retryNumber, updateProductSnapshots]);
+  const unavailableItems = items.filter((item) => unavailableIds.includes(item.productId));
+  const canCheckout = snapshotCheck === "ready" && unavailableItems.length === 0;
   const totals = useMemo(
     () =>
       calculateOrderTotals({
@@ -103,6 +136,7 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
         })}
       </ul>
       <aside className="h-fit rounded-xl border border-border bg-surface p-3 lg:p-5">
+        {pricesWereUpdated ? <p role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">تم تحديث سعر منتج أو أكثر إلى السعر الحالي. راجع الإجمالي قبل إتمام الطلب.</p> : null}
         {freeDeliveryEnabled ? <div className="mb-5 flex items-start gap-3 rounded-2xl border border-teal-100 bg-gradient-to-l from-teal-50 to-white p-4 text-right shadow-sm">
           <span aria-hidden="true" className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-sm"><TruckIcon /></span>
           <div className="min-w-0 flex-1">
@@ -111,11 +145,14 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-teal-100"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, freeDeliveryMin > 0 ? (totals.finalTotalOldYer / freeDeliveryMin) * 100 : 100)}%` }} /></div>
           </div>
         </div> : null}
+        {snapshotCheck === "checking" ? <p role="status" className="mb-3 text-center text-sm text-muted">جارٍ التحقق من الأسعار الحالية…</p> : null}
+        {snapshotCheck === "error" ? <p className="mb-3 text-center text-sm text-rose-700">تعذر التحقق من الأسعار. <button type="button" onClick={() => setRetryNumber((value) => value + 1)} className="underline">إعادة المحاولة</button></p> : null}
+        {unavailableItems.length > 0 ? <div className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900"><p>أزل المنتجات غير المتاحة قبل إتمام الطلب:</p>{unavailableItems.map((item) => <p key={item.productId} className="mt-1">{item.name} <button type="button" className="underline" onClick={() => removeItem(item.productId, item.colorId, item.materialId)}>إزالة</button></p>)}</div> : null}
         <div className="hidden lg:block">
           <h2 className="font-semibold">ملخص الطلب</h2>
           <div className="mt-3 flex items-center justify-between gap-3"><span className="text-muted">الإجمالي ({items.length} منتجات)</span><strong className="inline-flex items-baseline gap-1.5"><span className="text-lg font-bold tabular-nums">{formatIntegerWestern(totals.finalTotalOldYer)}</span><span className="text-sm font-medium text-muted">ر.ي قديم</span></strong></div>
           {!totals.freeDeliveryApplied ? <p className="mt-2 text-xs text-muted">تُحسب رسوم التوصيل حسب المنطقة عند إتمام الطلب.</p> : null}
-          <Link href="/checkout" className="mt-4 block rounded-md bg-primary px-4 py-3 text-center text-white hover:bg-primary-hover">متابعة إلى إتمام الطلب</Link>
+          {canCheckout ? <Link href="/checkout" className="mt-4 block rounded-md bg-primary px-4 py-3 text-center text-white hover:bg-primary-hover">متابعة إلى إتمام الطلب</Link> : <button type="button" disabled className="mt-4 block w-full cursor-not-allowed rounded-md bg-slate-300 px-4 py-3 text-center text-slate-600">متابعة إلى إتمام الطلب</button>}
           <Link href="/products" className="mt-3 block text-center text-sm text-primary">متابعة التسوق</Link>
         </div>
       </aside>
@@ -125,7 +162,7 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
             <p className="text-xs font-medium text-muted">ملخص الطلب · {items.length} منتجات</p>
             <p className="inline-flex items-baseline gap-1.5 text-text"><span className="text-base font-bold tabular-nums">{formatIntegerWestern(totals.finalTotalOldYer)}</span><span className="text-xs font-medium text-muted">ر.ي قديم</span></p>
           </div>
-          <Link href="/checkout" className="flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-hover">متابعة إلى إتمام الطلب</Link>
+          {canCheckout ? <Link href="/checkout" className="flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-hover">متابعة إلى إتمام الطلب</Link> : <button type="button" disabled className="flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-300 px-4 py-3 text-sm font-bold text-slate-600">{snapshotCheck === "checking" ? "جارٍ التحقق من الأسعار…" : "إتمام الطلب غير متاح مؤقتًا"}</button>}
         </div>
       </div>
     </div>

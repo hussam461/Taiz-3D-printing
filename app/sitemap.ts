@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { cachePublicQuery } from "@/lib/queries/public-cache";
+import { cachePublicQuery, STOREFRONT_PRODUCTS_CACHE_TAG } from "@/lib/queries/public-cache";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taiz3dprinting.dev").replace(/\/+$/, "");
@@ -25,7 +25,7 @@ const getPublishedProductSlugs = cachePublicQuery("sitemap-published-products", 
   }
 
   return products;
-});
+}, [STOREFRONT_PRODUCTS_CACHE_TAG]);
 
 export const dynamic = "force-dynamic";
 

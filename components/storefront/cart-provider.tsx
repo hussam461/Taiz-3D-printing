@@ -3,6 +3,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState, createContext } from "react";
 import { CartAddedToast } from "@/components/storefront/cart-added-toast";
 import { MAX_CART_QUANTITY } from "@/types/domain";
+import type { CartProductSnapshot } from "@/lib/queries/storefront";
 
 export type CartItem = {
   productId: string;
@@ -28,6 +29,7 @@ type CartContextValue = {
   setVariant: (productId: string, colorId: string | null, materialId: string | null, nextColorId: string | null, nextColorName: string, nextMaterialId: string | null, nextMaterialName: string) => void;
   removeItem: (productId: string, colorId: string | null, materialId: string | null) => void;
   replaceWith: (item: CartItem) => void;
+  updateProductSnapshots: (products: CartProductSnapshot[]) => void;
   clear: () => void;
   count: number;
 };
@@ -144,6 +146,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const replaceWith = useCallback((item: CartItem) => setItems([item]), []);
+  const updateProductSnapshots = useCallback((products: CartProductSnapshot[]) => {
+    const byId = new Map(products.map((product) => [product.id, product]));
+    setItems((current) => current.map((item) => {
+      const product = byId.get(item.productId);
+      return product?.isActive ? {
+        ...item,
+        name: product.name,
+        slug: product.slug,
+        image: product.image,
+        basePriceOldYer: product.basePriceOldYer,
+        discountPercent: product.discountPercent,
+      } : item;
+    }));
+  }, []);
   const clear = useCallback(() => setItems([]), []);
 
   const value = useMemo(
@@ -155,10 +171,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setVariant,
       removeItem,
       replaceWith,
+      updateProductSnapshots,
       clear,
       count: items.reduce((sum, item) => sum + item.quantity, 0),
     }),
-    [items, ready, addItem, setQuantity, setVariant, removeItem, replaceWith, clear],
+    [items, ready, addItem, setQuantity, setVariant, removeItem, replaceWith, updateProductSnapshots, clear],
   );
 
   return (

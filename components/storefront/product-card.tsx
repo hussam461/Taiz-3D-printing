@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { discountedUnitPrice } from "@/lib/pricing";
 import { formatOldYer, toWesternDigits } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
@@ -21,16 +22,22 @@ export function ProductCardView({
   const image = publicMediaUrl(product.main_image);
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border/80 bg-surface shadow-sm">
-      <TopLink href={`/products/${product.slug}`} aria-label={`عرض ${product.name}`} className="group block aspect-[5/4] overflow-hidden bg-slate-50 transition-transform duration-150 active:scale-[0.998] motion-reduce:transition-none">
+      <TopLink href={`/products/${product.slug}`} aria-label={`عرض ${product.name}`} className="group relative block aspect-[5/4] overflow-hidden bg-slate-50 transition-transform duration-150 active:scale-[0.998] motion-reduce:transition-none">
         {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={product.name} loading="lazy" className="h-full w-full object-contain transition-transform duration-300 motion-reduce:transition-none group-hover:scale-[1.02]" />
+          <Image
+            src={image}
+            alt={product.name}
+            fill
+            sizes="(max-width: 639px) 46vw, (max-width: 1023px) 31vw, (max-width: 1279px) 24vw, 300px"
+            quality={75}
+            className="object-contain transition-transform duration-300 motion-reduce:transition-none group-hover:scale-[1.02]"
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted">بدون صورة</div>
         )}
       </TopLink>
       <div className="flex flex-1 flex-col gap-2 p-3 sm:gap-2.5 sm:p-4">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-text sm:text-base sm:leading-6">
+        <h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-text sm:min-h-12 sm:text-base sm:leading-6">
           <TopLink href={`/products/${product.slug}`} className="transition-colors duration-150 hover:text-teal-600 focus-visible:text-teal-600">
             {product.name}
           </TopLink>

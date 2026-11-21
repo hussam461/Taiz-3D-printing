@@ -223,3 +223,8 @@ summary {
 .cart-toast-enter {
   animation: cart-toast-enter 220ms ease-out both;
 }
+
+@keyframes storefront-filter-progress {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-300%); }
+}

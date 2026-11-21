@@ -22,6 +22,8 @@ export const checkoutItemSchema = z.object({
   quantity: z.number().int().min(1).max(MAX_CART_QUANTITY),
   colorId: z.string().uuid().nullable(),
   materialId: z.string().uuid().nullable(),
+  expectedBasePriceOldYer: z.number().finite().nonnegative(),
+  expectedDiscountPercent: z.number().finite().min(0).max(100).nullable(),
 });
 
 export const checkoutPayloadSchema = z.object({

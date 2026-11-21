@@ -3,11 +3,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, publicSupabaseEnv } from "@/lib/supabase/env";
 
 export const STOREFRONT_PUBLIC_CACHE_TAG = "storefront-public-data";
+export const STOREFRONT_PRODUCTS_CACHE_TAG = "storefront-products";
 export const STOREFRONT_PUBLIC_CACHE_SECONDS = 60 * 60 * 24 * 365;
 
 export function cachePublicQuery<Args extends unknown[], Result>(
   key: string,
   query: (supabase: SupabaseClient, ...args: Args) => Promise<Result>,
+  tags: string[] = [STOREFRONT_PUBLIC_CACHE_TAG],
 ): (...args: Args) => Promise<Result> {
   return unstable_cache(
     async (...args: Args) => {
@@ -19,6 +21,6 @@ export function cachePublicQuery<Args extends unknown[], Result>(
       return query(supabase, ...args);
     },
     ["storefront-public", key],
-    { revalidate: STOREFRONT_PUBLIC_CACHE_SECONDS, tags: [STOREFRONT_PUBLIC_CACHE_TAG] },
+    { revalidate: STOREFRONT_PUBLIC_CACHE_SECONDS, tags },
   );
 }

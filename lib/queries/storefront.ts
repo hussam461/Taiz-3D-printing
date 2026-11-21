@@ -2,7 +2,7 @@ import { cache } from "react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { publicMediaUrl } from "@/lib/storage/public-url";
-import { cachePublicQuery } from "@/lib/queries/public-cache";
+import { cachePublicQuery, STOREFRONT_PRODUCTS_CACHE_TAG } from "@/lib/queries/public-cache";
 
 const DEFAULT_GENERAL_WHATSAPP_MESSAGE = "السلام عليكم، أريد الاستفسار عن منتجاتكم.";
 
@@ -272,7 +272,7 @@ const getCachedFeaturedProducts = cachePublicQuery("featured-products", async (s
     .order("created_at", { ascending: false });
   if (error) throw error;
   return mapProducts(data ?? []);
-});
+}, [STOREFRONT_PRODUCTS_CACHE_TAG]);
 
 export async function getFeaturedProducts(): Promise<ProductCard[]> {
   if (!isSupabaseConfigured()) return [];
@@ -291,7 +291,7 @@ const getCachedLatestProducts = cachePublicQuery("latest-products", async (supab
     .limit(8);
   if (error) throw error;
   return mapProducts(data ?? []);
-});
+}, [STOREFRONT_PRODUCTS_CACHE_TAG]);
 
 export async function getLatestProducts(): Promise<ProductCard[]> {
   if (!isSupabaseConfigured()) return [];
@@ -311,7 +311,7 @@ const getCachedRelatedProducts = cachePublicQuery("related-products", async (sup
     .limit(8);
   if (error) throw error;
   return mapProducts(data ?? []);
-});
+}, [STOREFRONT_PRODUCTS_CACHE_TAG]);
 
 export async function getRelatedProducts(categorySlug: string, excludeProductId: string): Promise<ProductCard[]> {
   if (!isSupabaseConfigured() || !categorySlug) return [];
@@ -411,7 +411,7 @@ const getCachedSearchProducts = cachePublicQuery("product-search", async (supaba
   const { data, count, error } = await buildRequest().range(from, to);
   if (error) throw error;
   return { items: mapProducts(data ?? []), total: count ?? 0, page, pageSize };
-});
+}, [STOREFRONT_PRODUCTS_CACHE_TAG]);
 
 export async function searchProducts(query: ProductListQuery) {
   const page = Math.max(1, query.page ?? 1);
@@ -435,7 +435,49 @@ const getCachedProductBySlug = cachePublicQuery("product-by-slug", async (supaba
     .maybeSingle();
   if (error) throw error;
   return data;
-});
+}, [STOREFRONT_PRODUCTS_CACHE_TAG]);
+
+export type CartProductSnapshot = {
+  id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+  basePriceOldYer: number;
+  discountPercent: number | null;
+  isActive: boolean;
+};
+
+const getCachedCartProductSnapshots = cachePublicQuery(
+  "cart-product-snapshots",
+  async (supabase, ids: string[]): Promise<CartProductSnapshot[]> => {
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, name, slug, base_price_old_yer, discount_percent, is_active, product_images(storage_path, is_main)")
+      .in("id", ids);
+    if (error) throw error;
+    return (data ?? []).map((product) => {
+      const images = product.product_images as { storage_path: string; is_main: boolean }[] | null;
+      const main = images?.find((image) => image.is_main) ?? images?.[0];
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        image: main?.storage_path ?? null,
+        basePriceOldYer: Number(product.base_price_old_yer),
+        discountPercent: product.discount_percent == null ? null : Number(product.discount_percent),
+        isActive: Boolean(product.is_active),
+      };
+    });
+  },
+  [STOREFRONT_PRODUCTS_CACHE_TAG],
+);
+
+export async function getCartProductSnapshots(ids: string[]) {
+  const normalizedIds = [...new Set(ids)].sort();
+  if (!isSupabaseConfigured()) throw new Error("Supabase is not configured");
+  return getCachedCartProductSnapshots(normalizedIds);
+}
 
 export const getProductBySlug = cache(async (slug: string) => {
   if (!isSupabaseConfigured()) return null;
