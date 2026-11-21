@@ -18,6 +18,8 @@ import { Suspense } from "react";
 import { StorefrontPageLoading } from "@/components/storefront/page-loading";
 import { createPublicPageMetadata } from "@/lib/public-metadata";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = createPublicPageMetadata(
   "وجهتك الأولى في اليمن لعالم التصميم والطباعة ثلاثية الأبعاد.",
   "حوّل أفكارك إلى قطع ملموسة مع Taiz 3D Printing! اكتشف منتجات مبتكرة مصنوعة بالطباعة ثلاثية الأبعاد، وتصفّح تشكيلتنا من المنتجات الجاهزة، أو اطلب تصميمًا وطباعة قطعة مخصصة تناسب فكرتك واحتياجك. نقرّب لك عالم الطباعة ثلاثية الأبعاد، من الفكرة إلى المنتج.",
