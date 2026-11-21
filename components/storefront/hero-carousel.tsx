@@ -10,9 +10,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   const [activeIndex, setActiveIndex] = useState(0);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [imageLoadError, setImageLoadError] = useState(false);
-  const [loadingPlaceholderUrl, setLoadingPlaceholderUrl] = useState<string | null>(null);
   const activeIndexRef = useRef(0);
-  const loadedHeroImages = useRef(new Set<string>());
   const navigationPending = useRef(false);
   const failedImages = useRef(new Set<string>());
   const imagePreloads = useRef(new Map<string, Promise<void>>());
@@ -21,12 +19,6 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   const suppressClick = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const multiple = slides.length > 1;
-  const activeImageUrl = slides[activeIndex]?.image_url ?? slides[0]?.image_url ?? null;
-  const activeImageUrlRef = useRef(activeImageUrl);
-
-  useEffect(() => {
-    activeImageUrlRef.current = activeImageUrl;
-  }, [activeImageUrl]);
 
   const preloadImage = useCallback((src: string) => {
     const existing = imagePreloads.current.get(src);
@@ -76,7 +68,6 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
         setImageLoadError(false);
         setPreviousIndex(activeIndexRef.current);
         activeIndexRef.current = nextIndex;
-        activeImageUrlRef.current = slides[nextIndex].image_url;
         setActiveIndex(nextIndex);
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
         transitionTimeout.current = window.setTimeout(() => {
@@ -98,22 +89,6 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   }, [activeIndex, multiple, preloadImage, slides]);
 
   useEffect(() => {
-    if (!activeImageUrl || loadedHeroImages.current.has(activeImageUrl)) {
-      setLoadingPlaceholderUrl(null);
-      return;
-    }
-
-    setLoadingPlaceholderUrl(null);
-    const timer = window.setTimeout(() => {
-      if (activeImageUrlRef.current === activeImageUrl && !loadedHeroImages.current.has(activeImageUrl)) {
-        setLoadingPlaceholderUrl(activeImageUrl);
-      }
-    }, 180);
-
-    return () => window.clearTimeout(timer);
-  }, [activeImageUrl]);
-
-  useEffect(() => {
     if (!multiple || prefersReducedMotion) return;
     const timer = window.setTimeout(() => { void goTo(activeIndexRef.current + 1, true); }, 10000);
     return () => window.clearTimeout(timer);
@@ -126,7 +101,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   if (!slides.length) return null;
   const slide = slides[activeIndex] ?? slides[0];
   const content = (
-    <div key={slide.id} className={`hero-content-enter flex h-full w-full flex-col items-center justify-center px-12 py-2 text-center text-white sm:px-20 sm:py-10 ${prefersReducedMotion ? "[animation:none]" : ""}`}>
+    <div key={slide.id} className="flex h-full w-full flex-col items-center justify-center px-12 py-2 text-center text-white sm:px-20 sm:py-10">
       {slide.title?.trim() ? <h1 className="max-w-4xl text-xl font-bold leading-tight drop-shadow-sm sm:text-4xl md:text-5xl">{slide.title}</h1> : null}
       {slide.description ? <p className={`mx-auto max-w-2xl text-sm leading-5 text-white/90 drop-shadow sm:text-lg sm:leading-7 ${slide.title?.trim() ? "mt-2 sm:mt-4" : ""}`}>{slide.description}</p> : null}
       {slide.href ? <span className="mt-3 inline-flex min-h-9 items-center rounded-lg bg-white px-4 py-2 text-xs font-semibold text-navy shadow-md transition-colors hover:bg-slate-100 sm:mt-7 sm:min-h-11 sm:px-5 sm:py-2.5 sm:text-sm">اكتشف المزيد</span> : null}
@@ -138,7 +113,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
       aria-label="العروض والخدمات الرئيسية"
       aria-roledescription="معرض شرائح"
       aria-live="off"
-      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary lg:aspect-auto lg:h-[clamp(28rem,34.4vw,41.25rem)]"
+      className="group relative isolate h-auto touch-pan-y select-none aspect-[2.56/1] overflow-hidden bg-gradient-to-br from-[#0f766e] via-[#0d9488] to-[#14b8a6] lg:aspect-auto lg:h-[clamp(28rem,34.4vw,41.25rem)]"
       onPointerDown={(event) => { pointerStartX.current = event.clientX; suppressClick.current = false; }}
       onPointerUp={(event) => {
         if (pointerStartX.current === null) return;
@@ -156,26 +131,18 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
         suppressClick.current = false;
       }}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary" aria-hidden="true">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0f766e] via-[#0d9488] to-[#14b8a6]" aria-hidden="true">
         {slides.map((item, index) => {
           const isActive = index === activeIndex;
           const isPrevious = index === previousIndex;
           if (!isActive && !isPrevious) return null;
           return (
             <div key={item.id} className={`absolute inset-0 ${isActive ? `z-20 opacity-100 ${previousIndex !== null && !prefersReducedMotion ? "hero-slide-enter" : ""}` : "z-10 opacity-100"}`}>
-              <StorefrontImage src={item.image_url} alt="" fill preload={isActive && activeIndex === 0} sizes="100vw" quality={75} onLoad={() => {
-                loadedHeroImages.current.add(item.image_url);
-                if (activeImageUrlRef.current === item.image_url) setLoadingPlaceholderUrl(null);
-              }} className="z-10 object-contain object-center lg:object-cover" />
+              <StorefrontImage src={item.image_url} alt="" fill preload={isActive && activeIndex === 0} loading={isActive && activeIndex !== 0 ? "eager" : undefined} sizes="100vw" quality={75} className="z-10 object-contain object-center lg:object-cover" />
               <div className="absolute inset-0 z-20 bg-gradient-to-b from-navy/10 via-transparent to-navy/35" />
             </div>
           );
         })}
-        {loadingPlaceholderUrl === slide.image_url ? (
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30 overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary">
-            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/[0.08] to-transparent motion-reduce:animate-none" />
-          </div>
-        ) : null}
       </div>
 
       {slide.href ? (
