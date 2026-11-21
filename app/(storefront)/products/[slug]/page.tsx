@@ -8,7 +8,7 @@ import { discountedUnitPrice } from "@/lib/pricing";
 import { formatOldYer } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
 import type { Specification } from "@/types/domain";
-import Image from "next/image";
+import { StorefrontImage } from "@/components/storefront/storefront-image";
 import { Suspense } from "react";
 import { productDescriptionToText, sanitizeProductDescriptionMarkup } from "@/lib/validation/product";
 
@@ -107,7 +107,7 @@ export default async function ProductPage({
       <div className="grid min-w-0 gap-8 lg:grid-cols-[1.3fr_1fr]">
       <div className="min-w-0">
         <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-border bg-white">
-          {image ? (() => { const src = publicMediaUrl(image.storage_path); return src ? <Image src={src} alt={image.alt_text ?? product.name} fill sizes="(max-width: 1024px) 100vw, 55vw" quality={75} className="object-contain" /> : null; })() : null}
+          {image ? (() => { const src = publicMediaUrl(image.storage_path); return src ? <StorefrontImage src={src} alt={image.alt_text ?? product.name} fill sizes="(max-width: 1024px) 100vw, 55vw" quality={75} className="object-contain" /> : null; })() : null}
         </div>
       </div>
       <div className="min-w-0 space-y-4">

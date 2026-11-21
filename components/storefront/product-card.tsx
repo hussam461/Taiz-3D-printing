@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { StorefrontImage } from "@/components/storefront/storefront-image";
 import { discountedUnitPrice } from "@/lib/pricing";
 import { formatOldYer, toWesternDigits } from "@/lib/formatting/money";
 import { publicMediaUrl } from "@/lib/storage/public-url";
@@ -24,7 +24,7 @@ export function ProductCardView({
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border/80 bg-surface shadow-sm">
       <TopLink href={`/products/${product.slug}`} aria-label={`عرض ${product.name}`} className="group relative block aspect-[5/4] overflow-hidden bg-slate-50 transition-transform duration-150 active:scale-[0.998] motion-reduce:transition-none">
         {image ? (
-          <Image
+          <StorefrontImage
             src={image}
             alt={product.name}
             fill

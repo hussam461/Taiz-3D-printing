@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { StorefrontImage } from "@/components/storefront/storefront-image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HomepageSlide } from "@/lib/queries/storefront";
@@ -9,7 +9,6 @@ import { usePrefersReducedMotion } from "@/components/storefront/use-reduced-mot
 export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image_url: string }> }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
-  const [interacting, setInteracting] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
   const [loadingPlaceholderUrl, setLoadingPlaceholderUrl] = useState<string | null>(null);
   const activeIndexRef = useRef(0);
@@ -115,10 +114,10 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
   }, [activeImageUrl]);
 
   useEffect(() => {
-    if (!multiple || prefersReducedMotion || interacting) return;
-    const timer = window.setInterval(() => { void goTo(activeIndexRef.current + 1, true); }, 6000);
-    return () => window.clearInterval(timer);
-  }, [goTo, interacting, multiple, prefersReducedMotion]);
+    if (!multiple || prefersReducedMotion) return;
+    const timer = window.setTimeout(() => { void goTo(activeIndexRef.current + 1, true); }, 10000);
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, goTo, multiple, prefersReducedMotion]);
 
   useEffect(() => () => {
     if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
@@ -156,10 +155,6 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
         event.stopPropagation();
         suppressClick.current = false;
       }}
-      onMouseEnter={() => setInteracting(true)}
-      onMouseLeave={() => setInteracting(false)}
-      onFocus={() => setInteracting(true)}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setInteracting(false); }}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#0b1220] via-[#115e59] to-primary" aria-hidden="true">
         {slides.map((item, index) => {
@@ -168,8 +163,7 @@ export function HeroCarousel({ slides }: { slides: Array<HomepageSlide & { image
           if (!isActive && !isPrevious) return null;
           return (
             <div key={item.id} className={`absolute inset-0 ${isActive ? `z-20 opacity-100 ${previousIndex !== null && !prefersReducedMotion ? "hero-slide-enter" : ""}` : "z-10 opacity-100"}`}>
-              <Image src={item.image_url} alt="" fill sizes="100vw" quality={75} loading={isActive ? "eager" : "lazy"} aria-hidden="true" className="scale-110 object-cover object-center opacity-60 blur-2xl" />
-              <Image src={item.image_url} alt="" fill preload={isActive && activeIndex === 0} sizes="100vw" quality={75} onLoad={() => {
+              <StorefrontImage src={item.image_url} alt="" fill preload={isActive && activeIndex === 0} sizes="100vw" quality={75} onLoad={() => {
                 loadedHeroImages.current.add(item.image_url);
                 if (activeImageUrlRef.current === item.image_url) setLoadingPlaceholderUrl(null);
               }} className="z-10 object-contain object-center lg:object-cover" />

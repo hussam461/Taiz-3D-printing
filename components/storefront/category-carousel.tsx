@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { StorefrontImage } from "@/components/storefront/storefront-image";
 import { useEffect, useRef, useState } from "react";
 import type { Category } from "@/lib/queries/storefront";
 
@@ -56,16 +56,16 @@ export function CategoryCarousel({ categories, allProductsImageUrl, customOrderI
       </button>
       <div ref={scrollRef} dir="rtl" className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto px-2 pb-1 sm:gap-4 sm:px-12">
         <Link dir="rtl" href="/products" className={tileClassName}>
-          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">{allProductsImageUrl ? <Image src={allProductsImageUrl} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="products" /></span>}</span>
+          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">{allProductsImageUrl ? <StorefrontImage src={allProductsImageUrl} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="products" /></span>}</span>
           <span className="flex min-h-9 items-center justify-center px-1 py-1.5 text-xs font-semibold sm:min-h-11 sm:text-sm">جميع المنتجات</span>
         </Link>
         <Link dir="rtl" href="/custom-order" className={tileClassName}>
-          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">{customOrderImageUrl ? <Image src={customOrderImageUrl} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="custom" /></span>}</span>
+          <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">{customOrderImageUrl ? <StorefrontImage src={customOrderImageUrl} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="custom" /></span>}</span>
           <span className="flex min-h-9 items-center justify-center px-1 py-1.5 text-xs font-semibold sm:min-h-11 sm:text-sm">طلب مخصّص</span>
         </Link>
         {categories.map((category) => <Link dir="rtl" key={category.id} href={`/products?category=${category.slug}`} className={tileClassName}>
           <span className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-50 sm:aspect-[5/4]">
-            {category.image_url ? <Image src={category.image_url} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center transition-transform duration-300 motion-reduce:transition-none group-hover:scale-[1.02]" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="category" /></span>}
+            {category.image_url ? <StorefrontImage src={category.image_url} alt="" fill sizes="(max-width: 639px) 34vw, 240px" className="object-cover object-center transition-transform duration-300 motion-reduce:transition-none group-hover:scale-[1.02]" /> : <span className="flex h-full items-center justify-center"><CategoryIcon type="category" /></span>}
           </span>
           <span className="line-clamp-2 flex min-h-8 items-center justify-center px-1 py-1 text-[11px] font-semibold leading-4 sm:min-h-11 sm:px-1.5 sm:py-1.5 sm:text-sm sm:leading-normal">{category.name}</span>
         </Link>)}
