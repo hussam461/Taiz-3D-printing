@@ -19,9 +19,10 @@ import { StorefrontPageLoading } from "@/components/storefront/page-loading";
 import { createPublicPageMetadata } from "@/lib/public-metadata";
 
 export const metadata = createPublicPageMetadata(
-  "طباعة ثلاثية الأبعاد ومنتجات مخصصة",
-  "اكتشف منتجات الطباعة ثلاثية الأبعاد والطلبات المخصصة من متجر Taiz 3D Printing اليمني.",
+  "وجهتك الأولى في اليمن لعالم التصميم والطباعة ثلاثية الأبعاد.",
+  "حوّل أفكارك إلى قطع ملموسة مع Taiz 3D Printing! اكتشف منتجات مبتكرة مصنوعة بالطباعة ثلاثية الأبعاد، وتصفّح تشكيلتنا من المنتجات الجاهزة، أو اطلب تصميمًا وطباعة قطعة مخصصة تناسب فكرتك واحتياجك. نقرّب لك عالم الطباعة ثلاثية الأبعاد، من الفكرة إلى المنتج.",
   "/",
+  { absoluteTitle: true, fullDescription: true },
 );
 
 export default function HomePage() {
