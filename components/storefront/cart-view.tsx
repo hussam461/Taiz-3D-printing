@@ -76,11 +76,11 @@ export function CartView({ colors, materials, freeDeliveryEnabled, freeDeliveryM
   return (
     <div className="grid gap-6 pb-36 lg:grid-cols-[2fr_1fr] lg:pb-0">
       <ul className="space-y-4">
-        {items.map((item) => {
+        {items.map((item, itemIndex) => {
           const image = publicMediaUrl(item.image);
           return (
             <li
-              key={`${item.productId}-${item.colorId}-${item.materialId}`}
+              key={`${item.productId}-${itemIndex}`}
               className="relative grid min-w-0 grid-cols-2 gap-x-2 gap-y-2 rounded-xl border border-border bg-surface p-2 shadow-sm sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,14rem)] sm:items-start sm:gap-x-4 sm:gap-y-3 sm:p-4"
             >
               <div className="col-span-2 row-start-1 flex min-w-0 items-start justify-start gap-2 border-b border-border pb-2 sm:col-span-1 sm:col-start-1 sm:gap-2.5 sm:border-0 sm:pb-0">
