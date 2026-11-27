@@ -37,10 +37,7 @@ export function MobileNavMenu({ items, storeName, categories }: { items: NavItem
 
   useEffect(() => {
     if (!open) return;
-    const trigger = triggerRef.current;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    firstLinkRef.current?.focus();
+    firstLinkRef.current?.focus({ preventScroll: true });
 
     function closeOnOutsidePointer(event: PointerEvent) {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target) && !drawerRef.current?.contains(event.target)) setOpen(false);
@@ -48,17 +45,15 @@ export function MobileNavMenu({ items, storeName, categories }: { items: NavItem
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpen(false);
-        triggerRef.current?.focus();
+        triggerRef.current?.focus({ preventScroll: true });
       }
     }
 
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", closeOnEscape);
-      trigger?.focus();
     };
   }, [open]);
 
@@ -98,7 +93,7 @@ export function MobileNavMenu({ items, storeName, categories }: { items: NavItem
                 </span>
                 <div className="min-w-0"><p className="text-[11px] font-semibold text-primary">تصفّح المتجر</p><p className="mt-1 truncate text-sm font-bold text-navy">{storeName}</p></div>
               </div>
-              <button type="button" aria-label="إغلاق القائمة" onClick={() => { setOpen(false); triggerRef.current?.focus(); }} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-white text-muted transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+              <button type="button" aria-label="إغلاق القائمة" onClick={() => { setOpen(false); triggerRef.current?.focus({ preventScroll: true }); }} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-white text-muted transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
               </button>
             </div>
